@@ -36,7 +36,7 @@ class Recommendation():
             return self.rating == object.rating
 
     def __str__(self):
-        return ('{' + self.track_id + ', ' + self.rating + '}')
+        return ('{' + str(self.track_id) + ', ' + str(self.rating) + '}')
 
 
 def main():
@@ -48,12 +48,13 @@ def main():
     items_bias = lil_matrix((1, M_csc.shape[1]))
 
     # Iterate over columns to compute items bias
-    for c_id in range(M_csc.shape[1]):
-        playlists = M_csc.data[M_csc.indptr[c_id]:M_csc.indptr[c_id + 1]]
+    #for c_id in range(M_csc.shape[1]):
+    #    playlists = M_csc.data[M_csc.indptr[c_id]:M_csc.indptr[c_id + 1]]
         # Items is a vector of ones, so its sum is equal to its size
-        cum = playlists.size
-        items_bias[0, c_id] = (cum / (cum + H))
-
+    #    cum = playlists.size
+    #    items_bias[0, c_id] = (cum / (cum + H))
+    item_sum = M_csc.sum(axis=0)
+    items_bias = item_sum/(item_sum + H)
     # Normalize M_csc subtracting item bias
     for c_id in range(M_csc.shape[1]):
         M_csc.data[M_csc.indptr[c_id]:
@@ -63,15 +64,19 @@ def main():
     M_csr = M_csc.tocsr()
     users_bias = lil_matrix((M_csr.shape[0], 1))
     # Iterate over rows to compute users bias
-    for r_id in range(M_csr.shape[0]):
-        tracks = M_csr.data[M_csr.indptr[r_id]:M_csr.indptr[r_id + 1]]
-        cum = tracks.size
-        users_bias[r_id, 0] = (cum / (cum + H))
+    #for r_id in range(M_csr.shape[0]):
+    #    tracks = M_csr.data[M_csr.indptr[r_id]:M_csr.indptr[r_id + 1]]
+    #    cum = tracks.size
+    #    users_bias[r_id, 0] = (cum / (cum + H))
+    user_sum = M_csr.sum(axis=1)
+    user_bias = user_sum/(user_sum + H)
 
     print('Computed user bias')
     # For each playlist in target_playlists
     rec = {}
+    i = 0
     for pl_id in dataset.target_playlists.keys():
+        i = i + 1
         # For each track in target_tracks
         rec.setdefault(pl_id, [Recommendation() for x in range(5)])
         for t_id in dataset.target_tracks.keys():
@@ -84,6 +89,8 @@ def main():
                 if r_ui > min_rec:
                     ind = rec[pl_id].index(min_rec)
                     rec[pl_id][ind] = r_ui
+        if i % 500 == 0:
+            print("Processed: " + str(i))
 
     print('Recommendation done.')
     with open('dict.csv', 'w') as csv_file:
