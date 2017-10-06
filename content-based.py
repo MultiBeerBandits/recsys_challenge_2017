@@ -4,8 +4,9 @@ import numpy as np
 import os.path
 
 
-def main():
-    icm = build_tracks_matrix('./data/tracks_final.csv')
+def train():
+    dataset = Dataset()
+    icm = dataset.build_icm('./data/tracks_final.csv')
     print('ICM matrix evaluated...')
     icm_csr = csr_matrix(icm)
     print(icm_csr.todense())
@@ -19,10 +20,14 @@ def main():
         print('Matrix normalized evaluated...')
         sim = (icm_bar.transpose()).dot(icm_bar)
         print('Similarity Matrix evaluated...')
-        print(sim.shape)
-        sim[sim < 0.1] = 0
-        save_sparse_matrix('./data/icm_sim.npz',sim)
+        print(sim.data[0:100])
+        sim_triu = triu(sim)
+        print("Non zero " + str(sim_triu.getnnz()))
+        print("Filtering done, saving...")
+        save_npz('./data/sparse_matrix.npz', sim_triu)
+        #sim_triu = triu(sim, format="csr")
+        #save_sparse_matrix('./data/icm_sim.npz', sim)
 
 
 if __name__ == '__main__':
-    main()
+    train()
