@@ -3,6 +3,11 @@ from test import get_norm_urm, Recommendation
 from scipy.sparse import *
 import numpy as np
 import os.path
+import logging
+
+# write log to file, filemode = 'w' tells to write each time a new file
+logging.basicConfig(filename='cbf.log', format='%(asctime)s %(message)s', filemode='w',
+                    level=logging.DEBUG)
 
 
 def build_recs_dict(dataset):
@@ -17,11 +22,14 @@ def main():
     ds = Dataset()
     icm = ds.build_icm('./data/tracks_final.csv')
     print('ICM matrix built...')
+    logging.info('ICM matrix built...')
     icm_csr = csr_matrix(icm)
     norm = np.sqrt(icm_csr.multiply(icm_csr).sum(0))
     print('  Norm done...')
+    logging.info('  Norm done...')
     icm_bar = icm_csr.multiply(csr_matrix(1 / norm))
     print('  Matrix normalized evaluated...')
+    logging.info(' Matrix normalized evaluated...')
     c = icm_bar
     c_t = icm_bar.transpose()
     chunksize = 1000
@@ -37,6 +45,8 @@ def main():
                 '{:08d}'.format(end) + '.npz')
         print(('Building cosine similarity matrix for [' +
                str(chunk) + ', ' + str(end) + ') ...'))
+        logging.info('Building cosine similarity matrix for [' +
+               str(chunk) + ', ' + str(end) + ') ...')
         if os.path.isfile(name):
             S_prime = load_sparse_matrix(name)
         else:
@@ -49,24 +59,31 @@ def main():
         r_bar = r_bar.tocsr()
         r_hat = r_bar.dot(S_prime.transpose()).tocsr()
         print('  Un-normalized r_hat evaluated...')
+        logging.info('  Un-normalized r_hat evaluated...')
         urm = ds.build_train_matrix().tocsr()
         mean_norm = urm.dot(S_prime.transpose()).tocsr()
         print('  Mean-Norm evaluated...')
+        logging.info('  Mean-Norm evaluated...')
         r_hat = csr_matrix((r_hat / mean_norm))
         print('  Normalized r_hat evaluated...')
+        logging.info('  Normalized r_hat evaluated...')
         urm_chunk = urm[:, chunk:end].tocsr()
         r_hat[urm_chunk.nonzero()] = 0
         r_hat.eliminate_zeros()
         print('  Chunked r_hat evaluated...\n',
+              '  Concatenating to final r_hat...  ', end='')
+        logging.info('  Chunked r_hat evaluated...\n',
               '  Concatenating to final r_hat...  ', end='')
         r_hat_final[:, chunk:end] = r_hat
         print('Done!')
     user_counter = 0
     for pl_id in recs.keys():
         if user_counter % 100 == 0:
-                print('.', end='', flush=True)
+            print('.', end='', flush=True)
+            logging.info(' ' + str(user_counter))
         pl_index = ds.playlist_id_mapper[pl_id]
-        pl_row = r_hat_final.data[r_hat_final.indptr[pl_index]:r_hat_final.indptr[pl_index + 1]]
+        pl_row = r_hat_final.data[r_hat_final.indptr[pl_index]
+            :r_hat_final.indptr[pl_index + 1]]
         for i in range(0, pl_row.shape[0]):
             track_index = r_hat_final.indeces[r_hat_final.indptr[pl_index] + i]
             track_id = ds.get_track_id_from_index(track_index)
