@@ -15,6 +15,9 @@ class Dataset():
         self.prefix = './data/'
         # initialization of user rating matrix
         self.urm = None
+        # Initialize clusters for duration and playcount
+        self.duration_intervals = 5
+        self.playcount_intervals = 5
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}
@@ -62,10 +65,12 @@ class Dataset():
                     # set attributes in icm
                     artist_index = self.attr_mapper['artist_id'][row['artist_id']]
                     icm[artist_index, track_index] = 1
+                    # albums
                     albums = parse_csv_array(row['album'])
                     for album in albums:
                         album_index = self.attr_mapper['album'][album]
                         icm[album_index, track_index] = 1
+                    # tags
                     tags = parse_csv_array(row['tags'])
                     for tag in tags:
                         tag_index = self.attr_mapper['tags'][tag]
@@ -138,7 +143,7 @@ def load_csv(path, dict_id):
     return data
 
 
-def build_tracks_mappers(path):
+def build_tracks_mappers(path, dataset):
     """
     Build the mappers of tracks
     """
@@ -151,6 +156,11 @@ def build_tracks_mappers(path):
     track_index_mapper = {}
     # this is the number of columns of the matrix of the matrix
     track_index = 0
+    # duration and playcount attributes
+    min_playcount = 10
+    max_playcount = 0
+    min_duration = 224000
+    max_duration = 224000
     with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file, delimiter='\t')
         for row in reader:
@@ -163,6 +173,21 @@ def build_tracks_mappers(path):
                 attrs['tags'].add(tag)
             track_id_mapper[row['track_id']] = track_index
             track_index_mapper[track_index] = row['track_id']
+            # duration
+            # duration is -1 if not present
+            if row['duration'] != None and row['duration'] != '':
+                duration = int(row['duration'])
+                if duration != -1:
+                    if duration < min_duration:
+                        min_duration = duration
+                    if duration > max_duration:
+                        max_duration = duration
+            if row['playcount'] != None and row['playcount'] != '':
+                playcount = int(row['playcount'])
+                if playcount < min_playcount:
+                    min_playcount = playcount
+                if playcount > max_playcount:
+                    max_playcount = playcount
             track_index += 1
     mapper = {'artist_id': {}, 'album': {}, 'tags': {}}
     attr_index = 0
@@ -175,6 +200,10 @@ def build_tracks_mappers(path):
     for v in attrs['tags']:
         mapper['tags'][v] = attr_index
         attr_index += 1
+    # compute ranges
+    self.duration_int = (max_duration - min_duration) / self.duration_intervals
+    self.playcount_int = (max_playcount - min_playcount)/self.playcount_intervals
+
     return track_id_mapper, track_index_mapper, attrs
 
 

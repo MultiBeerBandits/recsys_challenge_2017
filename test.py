@@ -67,18 +67,18 @@ def main():
         # todo
         row_clean = (r_tilde[pl_index].multiply(
             np.ones((1, r_tilde.shape[1])) - urm[pl_index])).tocsc()
-        print(row_clean.shape)
-        rates = row_clean[0, row_clean.nonzero()[1]][:]
-        print(rates)
-        max_indices = rates.argsort()[-5:][::-1]
+        print(row_clean[0].toarray())
+        max_indices = (row_clean[0].toarray()).argsort()[::-1][:5]
         # create empty list
         print(max_indices)
-        rec[pl_id] = ()
-        for ind in max_indices:
+        rec[pl_id] = []
+        print(row_clean[0, max_indices[0, len(max_indices[0])-1]])
+        print(row_clean[0, max_indices[0, 0]])
+        for ind in max_indices[0]:
             print(ind)
-            print(row_clean.nonzero()[1][ind])
-            tr_id = dataset.track_index_mapper[row_clean.nonzero()[1][ind]]
-            rec[pl_id].add(tr_id)
+            print(row_clean[0,ind])
+            tr_id = dataset.track_index_mapper[row_clean[0,ind]]
+            rec[pl_id].append(tr_id)
         print(rec[pl_id])
     # now r_tilde is ready, multiply it by 1 - urm to get only element not present in each playlist
     # r_tilde_clean = r_tilde .multiply(1 - urm)
