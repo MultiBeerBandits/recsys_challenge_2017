@@ -27,6 +27,7 @@ def main():
     chunksize = 1000
     mat_len = c_t.shape[0]
     recs = build_recs_dict(ds)
+    r_hat_final = lil_matrix((ds.playlists_number, ds.tracks_number))
     for chunk in range(0, mat_len, chunksize):
         if chunk + chunksize > mat_len:
             end = mat_len
@@ -56,23 +57,41 @@ def main():
         urm_chunk = urm[:, chunk:end].tocsr()
         r_hat[urm_chunk.nonzero()] = 0
         r_hat.eliminate_zeros()
-        print('  Final r_hat evaluated...',
-              '\nProducing recommandations...\n  ', end='')
-        user_counter = 0
-        for u_index in range(0, r_hat.shape[0]):
-            u_id = ds.playlist_index_mapper[u_index]
-            if u_id in recs:
-                if user_counter % 100 == 0:
-                    print('.', end='', flush=True)
-                for ch in range(0, r_hat.shape[1]):
-                    candidate = Recommendation()
-                    candidate.rating = r_hat[u_index, ch]
-                    candidate.track_id = ds.get_track_id_from_index(chunk + ch)
-                    min_rec = min(recs[u_id])
-                    if candidate > min_rec:
-                        recs[u_id][recs[u_id].index(min_rec)] = candidate
-                user_counter += 1
-        print('\n', end='', flush=True)
+        print('  Chunked r_hat evaluated...\n',
+              '  Concatenating to final r_hat...  ', end='')
+        r_hat_final[:, chunk:end] = r_hat
+        print('Done!')
+    user_counter = 0
+    for pl_id in recs.keys():
+        if user_counter % 100 == 0:
+                print('.', end='', flush=True)
+        pl_index = ds.playlist_id_mapper[pl_id]
+        pl_row = r_hat_final.data[r_hat_final.indptr[pl_index]:r_hat_final.indptr[pl_index + 1]]
+        for i in range(0, pl_row.shape[0]):
+            track_index = r_hat_final.indeces[r_hat_final.indptr[pl_index] + i]
+            track_id = ds.get_track_id_from_index(track_index)
+            candidate = Recommendation()
+            candidate.rating = pl_row[i]
+            candidate.track_id = track_id
+            min_rec = min(recs[pl_id])
+            if candidate > min_rec:
+                recs[pl_id][recs[pl_id].index(min_rec)] = candidate
+        user_counter += 1
+
+    # for u_index in range(0, r_hat.shape[0]):
+    #     u_id = ds.playlist_index_mapper[u_index]
+    #     if u_id in recs:
+    #         if user_counter % 100 == 0:
+    #             print('.', end='', flush=True)
+    #         for ch in range(0, r_hat.shape[1]):
+    #             candidate = Recommendation()
+    #             candidate.rating = r_hat[u_index, ch]
+    #             candidate.track_id = ds.get_track_id_from_index(chunk + ch)
+    #             min_rec = min(recs[u_id])
+    #             if candidate > min_rec:
+    #                 recs[u_id][recs[u_id].index(min_rec)] = candidate
+    #         user_counter += 1
+    #     print('\n', end='', flush=True)
     with open('submission.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
