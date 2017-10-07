@@ -25,8 +25,8 @@ class Dataset():
         # format: {column index: 'track_id'}
         # track_attr_mapper maps attributes to row index
         # format: {'artist_id': {'artist_key': row_index}}
-        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper = build_tracks_mappers(
-            self.prefix + 'tracks_final.csv')
+        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number = build_tracks_mappers(
+            self.prefix + 'tracks_final.csv', self)
         # build playlist mappers
         # playlist_id_mapper maps playlist id to columns of ucm
         # format: {'item_id': column_index}
@@ -57,23 +57,24 @@ class Dataset():
         AxI (A is the number of attributes and I is the number of items)
         """
         if not os.path.isfile('./data/icm_tracks_csr.npz'):
+            icm = lil_matrix((self.attrs_number, self.tracks_number))
             with open(path, newline='') as csv_file:
                 reader = csv.DictReader(csv_file, delimiter='\t')
                 for row in reader:
                     # get index of this track
                     track_index = self.track_id_mapper[row['track_id']]
                     # set attributes in icm
-                    artist_index = self.attr_mapper['artist_id'][row['artist_id']]
+                    artist_index = self.track_attr_mapper['artist_id'][row['artist_id']]
                     icm[artist_index, track_index] = 1
                     # albums
                     albums = parse_csv_array(row['album'])
                     for album in albums:
-                        album_index = self.attr_mapper['album'][album]
+                        album_index = self.track_attr_mapper['album'][album]
                         icm[album_index, track_index] = 1
                     # tags
                     tags = parse_csv_array(row['tags'])
                     for tag in tags:
-                        tag_index = self.attr_mapper['tags'][tag]
+                        tag_index = self.track_attr_mapper['tags'][tag]
                         icm[tag_index, track_index] = 1
             save_sparse_matrix('./data/icm_tracks_csr.npz', icm)
         else:
@@ -111,11 +112,21 @@ class Dataset():
             save_sparse_matrix(path, self.urm)
         return self.urm
 
-    def get_track_id_from_index(self,index):
+    def get_track_id_from_index(self, index):
         return self.track_index_mapper[index]
 
-    def get_track_index_from_id(self,tr_id):
+    def get_track_index_from_id(self, tr_id):
         return self.track_id_mapper[tr_id]
+
+    def build_target_tracks_mask(self, start, end):
+        """
+        Returns a (end-start) X #items lil_matrix whose non-zero
+        rows are those of the target tracks"""
+        M = lil_matrix((end - start, self.tracks_number))
+        for i in range(start, end):
+            if self.get_track_id_from_index(i) in self.target_tracks:
+                M[i - start] = 1
+        return M
 
 
 def load_train_final(path):
@@ -176,14 +187,14 @@ def build_tracks_mappers(path, dataset):
             # duration
             # duration is -1 if not present
             if row['duration'] != None and row['duration'] != '':
-                duration = int(row['duration'])
+                duration = float(row['duration'])
                 if duration != -1:
                     if duration < min_duration:
                         min_duration = duration
                     if duration > max_duration:
                         max_duration = duration
             if row['playcount'] != None and row['playcount'] != '':
-                playcount = int(row['playcount'])
+                playcount = float(row['playcount'])
                 if playcount < min_playcount:
                     min_playcount = playcount
                 if playcount > max_playcount:
@@ -201,10 +212,10 @@ def build_tracks_mappers(path, dataset):
         mapper['tags'][v] = attr_index
         attr_index += 1
     # compute ranges
-    self.duration_int = (max_duration - min_duration) / self.duration_intervals
-    self.playcount_int = (max_playcount - min_playcount)/self.playcount_intervals
+    dataset.duration_int = (max_duration - min_duration) / dataset.duration_intervals
+    dataset.playcount_int = (max_playcount - min_playcount)/ dataset.playcount_intervals
 
-    return track_id_mapper, track_index_mapper, attrs
+    return track_id_mapper, track_index_mapper, mapper, attr_index
 
 
 def build_playlists_mappers(path):

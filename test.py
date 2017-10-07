@@ -12,7 +12,7 @@ class Recommendation():
 
     def __init__(self):
         self.track_id = ''
-        self.rating = 0.0
+        self.rating = -1000.0
 
     def __cmp__(self, object):
         if object is None:
@@ -30,6 +30,12 @@ class Recommendation():
         else:
             return self.rating < object.rating
 
+    def __gt__(self, object):
+        if object is None:
+            return False
+        else:
+            return self.rating > object.rating
+
     def __eq__(self, object):
         if object is None:
             return False
@@ -37,6 +43,9 @@ class Recommendation():
             return self.rating == object.rating
 
     def __str__(self):
+        return ('{' + str(self.track_id) + ', ' + str(self.rating) + '}')
+
+    def __repr__(self):
         return ('{' + str(self.track_id) + ', ' + str(self.rating) + '}')
 
 
@@ -123,9 +132,11 @@ def get_norm_urm(dataset):
     user_sum = M_csr.sum(axis=1)
     user_bias = user_sum / (user_sum + H)
     print('Computed user bias')
-    normalized_urm = M_csr - user_bias
+    for c_id in range(M_csr.shape[0]):
+        M_csr.data[M_csr.indptr[c_id]:
+                   M_csr.indptr[c_id + 1]] -= user_bias[c_id, 0]
 
-    return normalized_urm, user_bias, items_bias
+    return M_csr, user_bias, items_bias
 
 
 if __name__ == '__main__':
