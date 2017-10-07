@@ -72,8 +72,8 @@ def main():
         r_hat.eliminate_zeros()
         print('  Chunked r_hat evaluated...\n',
               '  Concatenating to final r_hat...  ', end='')
-        logging.info('  Chunked r_hat evaluated...\n',
-              '  Concatenating to final r_hat...  ', end='')
+        logging.info('  Chunked r_hat evaluated...\n' +
+              '  Concatenating to final r_hat...  ')
         r_hat_final[:, chunk:end] = r_hat
         print('Done!')
     user_counter = 0
