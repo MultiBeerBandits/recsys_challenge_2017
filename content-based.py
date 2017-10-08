@@ -6,7 +6,9 @@ import os.path
 import logging
 
 # write log to file, filemode = 'w' tells to write each time a new file
-logging.basicConfig(filename='cbf.log', format='%(asctime)s %(message)s', filemode='w',
+logging.basicConfig(filename='cbf.log',
+                    format='%(asctime)s %(message)s',
+                    filemode='w',
                     level=logging.DEBUG)
 
 
@@ -34,7 +36,6 @@ def main():
     c_t = icm_bar.transpose()
     chunksize = 1000
     mat_len = c_t.shape[0]
-    recs = build_recs_dict(ds)
     r_hat_final = lil_matrix((ds.playlists_number, ds.tracks_number))
     for chunk in range(0, mat_len, chunksize):
         if chunk + chunksize > mat_len:
@@ -46,7 +47,7 @@ def main():
         print(('Building cosine similarity matrix for [' +
                str(chunk) + ', ' + str(end) + ') ...'))
         logging.info('Building cosine similarity matrix for [' +
-               str(chunk) + ', ' + str(end) + ') ...')
+                     str(chunk) + ', ' + str(end) + ') ...')
         if os.path.isfile(name):
             S_prime = load_sparse_matrix(name)
         else:
@@ -61,28 +62,41 @@ def main():
         print('  Un-normalized r_hat evaluated...')
         logging.info('  Un-normalized r_hat evaluated...')
         urm = ds.build_train_matrix().tocsr()
-        mean_norm = urm.dot(S_prime.transpose()).tocsr()
+        mean_norm = csr_matrix(urm.dot(S_prime.transpose()))
         print('  Mean-Norm evaluated...')
         logging.info('  Mean-Norm evaluated...')
-        r_hat = csr_matrix((r_hat / mean_norm))
+        c = r_hat / mean_norm
+        c[np.isnan(c)] = 0
+        r_hat = csr_matrix(c)
         print('  Normalized r_hat evaluated...')
         logging.info('  Normalized r_hat evaluated...')
         urm_chunk = urm[:, chunk:end].tocsr()
+        print(r_hat.shape, urm_chunk.shape)
+        r_hat = r_hat.tolil()
         r_hat[urm_chunk.nonzero()] = 0
+        r_hat = r_hat.tocsr()
         r_hat.eliminate_zeros()
         print('  Chunked r_hat evaluated...\n',
-              '  Concatenating to final r_hat...  ', end='')
-        logging.info('  Chunked r_hat evaluated...\n' + '  Concatenating to final r_hat...  ')
+              ' Concatenating to final r_hat...  ', end='')
+        logging.info(('  Chunked r_hat evaluated...\n' +
+                      '  Concatenating to final r_hat...  '))
         r_hat_final[:, chunk:end] = r_hat
-        print('Done!')
+        r_hat_final = r_hat_final.tocsr()
+        for r_id in range(0, r_hat_final.shape[0]):
+            row = r_hat_final.data[r_hat_final.indptr[r_id]:r_hat_final.indptr[r_id + 1]]
+            sorted_row_idx = row.argsort()[:-5]
+            row[sorted_row_idx] = 0
+        r_hat_final.eliminate_zeros()
+        print('r_hat_final nnz:', r_hat_final.nnz)
+        r_hat_final = r_hat_final.tolil()
+
     user_counter = 0
     for pl_id in recs.keys():
         if user_counter % 100 == 0:
             print('.', end='', flush=True)
             logging.info(' ' + str(user_counter))
         pl_index = ds.playlist_id_mapper[pl_id]
-        pl_row = r_hat_final.data[r_hat_final.indptr[pl_index]
-            :r_hat_final.indptr[pl_index + 1]]
+        pl_row = r_hat_final.data[r_hat_final.indptr[pl_index]:r_hat_final.indptr[pl_index + 1]]
         for i in range(0, pl_row.shape[0]):
             track_index = r_hat_final.indeces[r_hat_final.indptr[pl_index] + i]
             track_id = ds.get_track_id_from_index(track_index)
@@ -93,21 +107,7 @@ def main():
             if candidate > min_rec:
                 recs[pl_id][recs[pl_id].index(min_rec)] = candidate
         user_counter += 1
-
-    # for u_index in range(0, r_hat.shape[0]):
-    #     u_id = ds.playlist_index_mapper[u_index]
-    #     if u_id in recs:
-    #         if user_counter % 100 == 0:
-    #             print('.', end='', flush=True)
-    #         for ch in range(0, r_hat.shape[1]):
-    #             candidate = Recommendation()
-    #             candidate.rating = r_hat[u_index, ch]
-    #             candidate.track_id = ds.get_track_id_from_index(chunk + ch)
-    #             min_rec = min(recs[u_id])
-    #             if candidate > min_rec:
-    #                 recs[u_id][recs[u_id].index(min_rec)] = candidate
-    #         user_counter += 1
-    #     print('\n', end='', flush=True)
+    print('\n', end='', flush=True)
     with open('submission.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
