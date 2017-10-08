@@ -16,8 +16,8 @@ class Dataset():
         # initialization of user rating matrix
         self.urm = None
         # Initialize clusters for duration and playcount
-        self.duration_intervals = 5
-        self.playcount_intervals = 5
+        self.duration_intervals = 10
+        self.playcount_intervals = 10
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}
@@ -50,6 +50,13 @@ class Dataset():
                                       'track_id')
         self.train_final = load_train_final(self.prefix + 'train_final.csv')
 
+        # weights of attributes
+        self.artist_weight = 1
+        self.album_weight = 1
+        self.tags_weight = 0.5
+        self.duration_weight = 0.2
+        self.playcount_weight = 0.2
+
     def build_icm(self, path):
         """
         returns the item content matrix using mappers defined in dataset class
@@ -64,18 +71,35 @@ class Dataset():
                     # get index of this track
                     track_index = self.track_id_mapper[row['track_id']]
                     # set attributes in icm
+                    artist_id = row['artist_id']
                     artist_index = self.track_attr_mapper['artist_id'][row['artist_id']]
-                    icm[artist_index, track_index] = 1
+                    icm[artist_index, track_index] = self.artist_weight
                     # albums
                     albums = parse_csv_array(row['album'])
                     for album in albums:
                         album_index = self.track_attr_mapper['album'][album]
-                        icm[album_index, track_index] = 1
+                        icm[album_index, track_index] = self.album_weight
                     # tags
                     tags = parse_csv_array(row['tags'])
                     for tag in tags:
                         tag_index = self.track_attr_mapper['tags'][tag]
-                        icm[tag_index, track_index] = 1
+                        icm[tag_index, track_index] = self.tags_weight
+                    # duration
+                    duration = row['duration']
+                    if duration is not None and duration != '' and float(duration) != -1:
+                        duration = float(duration) - self.min_duration
+                        duration_offset = min(int(duration / self.duration_int), self.duration_intervals - 1)
+                        duration_index = self.track_attr_mapper['duration'] + \
+                            duration_offset
+                        icm[duration_index, track_index] = self.duration_weight
+                    # playcount
+                    playcount = row['playcount']
+                    if playcount is not None and playcount != '' and float(playcount) != -1:
+                        playcount = float(playcount) - self.min_playcount
+                        playcount_offset = min(int(playcount / self.playcount_int), self.playcount_intervals - 1)
+                        playcount_index = self.track_attr_mapper['playcount'] + \
+                            playcount_offset
+                        icm[playcount_index, track_index] = self.playcount_weight
             save_sparse_matrix('./data/icm_tracks_csr.npz', icm)
         else:
             icm = load_sparse_matrix('./data/icm_tracks_csr.npz')
@@ -117,6 +141,12 @@ class Dataset():
 
     def get_track_index_from_id(self, tr_id):
         return self.track_id_mapper[tr_id]
+
+    def get_playlist_id_from_index(self, index):
+        return self.playlist_index_mapper[index]
+
+    def get_playlist_index_from_id(self, pl_id):
+        return self.playlist_id_mapper[pl_id]
 
     def build_target_tracks_mask(self, start, end):
         """
@@ -186,21 +216,27 @@ def build_tracks_mappers(path, dataset):
             track_index_mapper[track_index] = row['track_id']
             # duration
             # duration is -1 if not present
-            if row['duration'] != None and row['duration'] != '':
+            if row['duration'] is not None and row['duration'] != '':
                 duration = float(row['duration'])
-                if duration != -1:
+                # threshold for max and cleaning
+                if duration != -1 and duration / 1000 < 700:
                     if duration < min_duration:
                         min_duration = duration
                     if duration > max_duration:
                         max_duration = duration
-            if row['playcount'] != None and row['playcount'] != '':
+            if row['playcount'] is not None and row['playcount'] != '':
                 playcount = float(row['playcount'])
-                if playcount < min_playcount:
-                    min_playcount = playcount
-                if playcount > max_playcount:
-                    max_playcount = playcount
+                # threshold for max
+                if playcount < 5000:
+                    if playcount < min_playcount:
+                        min_playcount = playcount
+                    if playcount > max_playcount:
+                        max_playcount = playcount
             track_index += 1
-    mapper = {'artist_id': {}, 'album': {}, 'tags': {}}
+    # is a dictionary of dictionary
+    # for each attrbute a dictionary of keys of attribute and their index
+    mapper = {'artist_id': {}, 'album': {},
+              'tags': {}, 'duration': 0, 'playcount': 0}
     attr_index = 0
     for v in attrs['artist_id']:
         mapper['artist_id'][v] = attr_index
@@ -212,8 +248,18 @@ def build_tracks_mappers(path, dataset):
         mapper['tags'][v] = attr_index
         attr_index += 1
     # compute ranges
-    dataset.duration_int = (max_duration - min_duration) / dataset.duration_intervals
-    dataset.playcount_int = (max_playcount - min_playcount)/ dataset.playcount_intervals
+    dataset.duration_int = (max_duration - min_duration) / \
+        dataset.duration_intervals
+    dataset.playcount_int = (
+        max_playcount - min_playcount) / dataset.playcount_intervals
+    # set min duration and min playcount
+    dataset.min_duration = min_duration
+    dataset.min_playcount = min_playcount
+    # set index of duration and playcount
+    mapper['duration'] = attr_index
+    mapper['playcount'] = attr_index + dataset.duration_intervals
+
+    attr_index += dataset.duration_intervals + dataset.playcount_intervals + 1
 
     return track_id_mapper, track_index_mapper, mapper, attr_index
 
