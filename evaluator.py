@@ -49,9 +49,6 @@ def cross_validation(folds, train_dataset):
     # sublists is a list of lists. contains the folds
     sublists = [playlists[x:x + fold_size]
                 for x in range(0, len(playlists), fold_size)]
-
-    print('Fold size ' + str(fold_size))
-    print(' sublists: '+ str(len(sublists)))
     sample_number = 5
 
     # sublist is a list of playlist, sample 5 tracks for each playlist
@@ -65,7 +62,6 @@ def cross_validation(folds, train_dataset):
             test_dictionaries[fold_index][pl] = samples
             current_tg_tracks = current_tg_tracks.union(samples)
         target_tracks[fold_index] = list(current_tg_tracks)
-        print(len(test_dictionaries[fold_index].keys()))
         fold_index += 1
 
 

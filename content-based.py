@@ -32,7 +32,7 @@ def main():
     norm = np.sqrt(icm_csr.multiply(icm_csr).sum(0))
     print('  Norm done...')
     logging.info('  Norm done...')
-    icm_bar = icm_csr.multiply(csr_matrix(1 / (norm + H)))
+    icm_bar = icm_csr.multiply(csr_matrix(1 / (norm)))
     print('  Matrix normalized evaluated...')
     logging.info(' Matrix normalized evaluated...')
     c = icm_bar
