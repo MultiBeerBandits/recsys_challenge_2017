@@ -56,12 +56,20 @@ class Dataset():
         self.duration_weight = 0.2
         self.playcount_weight = 0.2
 
-    def build_icm(self, path):
+    def build_icm(self, path, weights):
         """
         returns the item content matrix using mappers defined in dataset class
         icm matrix encoded as follows:
         AxI (A is the number of attributes and I is the number of items)
+        weight is a list of attribute weights
+        0: artist, 1: album, 2: duration, 3: playcount
         """
+        # initialize attribute weights
+        self.artist_weight = weights[0]
+        self.album_weight = weights[1]
+        self.duration_weight = weights[2]
+        self.playcount_weight = weights[3]
+
         if not os.path.isfile('./data/icm_tracks_csr.npz'):
             icm = lil_matrix((self.attrs_number, self.tracks_number))
             with open(path, newline='') as csv_file:

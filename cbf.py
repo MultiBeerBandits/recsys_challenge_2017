@@ -17,23 +17,37 @@ class ContentBasedFiltering(object):
     # for keeping reference between tracks and column index
     tr_id_list = []
 
+    tr_number = 0
+
+    # dataset object
+    ds = None
+
+    # list of weights associated to attribute values
+    # artist, album, duration, playcount
+    weights = list()
+
+    def __init__(self, weights):
+        self.weights = weights
+
     def fit(self, urm, target_playlist, target_tracks, ds):
-        self.pl_id_list = target_playlist
-        self.tr_id_list = target_tracks
-        icm = ds.build_icm('./data/tracks_final.csv')
+        self.pl_id_list = list(target_playlist)
+        self.tr_id_list = list(target_tracks)
+        self.tr_number = len(target_tracks)
+        self.ds = ds
+        icm = ds.build_icm('./data/tracks_final.csv', self.weights)
         print('ICM matrix built...')
         icm_csr = csr_matrix(icm)
         norm = np.sqrt(icm_csr.multiply(icm_csr).sum(0))
         print('  Norm done...')
         logging.info('  Norm done...')
-        icm_bar = icm_csr.multiply(csr_matrix(1 / (norm + self.H)))
+        icm_bar = icm_csr.multiply(csr_matrix(1 / norm))
         print('  Matrix normalized evaluated...')
         logging.info(' Matrix normalized evaluated...')
         c = icm_bar
         c_t = icm_bar.transpose()
         chunksize = 1000
         mat_len = c_t.shape[0]
-        r_hat_final = lil_matrix((len(target_playlist), len(target_tracks)))
+        r_hat_final = lil_matrix((len(target_playlist), ds.tracks_number))
         urm_target = urm[[ds.get_playlist_index_from_id(x) for x in target_playlist]]
         for chunk in range(0, mat_len, chunksize):
             if chunk + chunksize > mat_len:
@@ -50,14 +64,14 @@ class ContentBasedFiltering(object):
             #    S_prime = load_sparse_matrix(name)
             # else:
             sim = c_t[chunk:chunk + chunksize].tocsr().dot(c)
-            M_s = ds.build_target_tracks_mask(chunk, end).tocsr()
+            M_s = self._build_target_tracks_mask(chunk, end, ds).tocsr()
             S_prime = sim.multiply(M_s).tocsr()
             S_prime.eliminate_zeros()
             # save_sparse_matrix(name, S_prime)
             r_hat = urm_target.dot(S_prime.transpose()).tocsr()
             print('  Un-normalized r_hat evaluated...')
             logging.info('  Un-normalized r_hat evaluated...')
-            mean_norm = csr_matrix(urm_target.dot(S_prime.transpose()))
+            mean_norm = urm_target.dot(S_prime.transpose())
             print('  Mean-Norm evaluated...')
             logging.info('  Mean-Norm evaluated...')
             r_hat = r_hat / mean_norm
@@ -66,7 +80,6 @@ class ContentBasedFiltering(object):
             print('  Normalized r_hat evaluated...')
             logging.info('  Normalized r_hat evaluated...')
             urm_chunk = urm_target[:, chunk:end].tocsr()
-            print(r_hat.shape, urm_chunk.shape)
             r_hat = r_hat.tolil()
             r_hat[urm_chunk.nonzero()] = 0
             r_hat = r_hat.tocsr()
@@ -83,7 +96,6 @@ class ContentBasedFiltering(object):
                 sorted_row_idx = row.argsort()[:-5]
                 row[sorted_row_idx] = 0
             r_hat_final.eliminate_zeros()
-            print('r_hat_final nnz:', r_hat_final.nnz)
             r_hat_final = r_hat_final.tolil()
         self.R_hat = r_hat_final
 
@@ -107,7 +119,7 @@ class ContentBasedFiltering(object):
             top_5 = []
             for i in range(0, pl_row.shape[0]):
                 t_index = r_hat_final.indices[r_hat_final.indptr[pl_index] + i]
-                track_id = ds.get_track_id_from_index(t_index)
+                track_id = self.ds.get_track_id_from_index(t_index)
                 top_5.append([track_id, pl_row[i]])
             top_5.sort(key=lambda x: x[1], reverse=True)
             track_ids = ''
@@ -115,3 +127,14 @@ class ContentBasedFiltering(object):
                 track_ids = track_ids + r[0] + ' '
                 recs[pl_id].append(r[0])
         return recs
+
+    def _build_target_tracks_mask(self, start, end, ds):
+        """
+        Returns a (end-start) X #items lil_matrix whose non-zero
+        rows are those of the target tracks
+        """
+        M = lil_matrix((end - start, 1))
+        for i in range(start, end):
+            if ds.get_track_id_from_index(i) in self.tr_id_list:
+                M[i - start] = 1
+        return M
