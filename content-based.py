@@ -83,7 +83,8 @@ def main():
         r_hat_final[:, chunk:end] = r_hat
         r_hat_final = r_hat_final.tocsr()
         for r_id in range(0, r_hat_final.shape[0]):
-            row = r_hat_final.data[r_hat_final.indptr[r_id]:r_hat_final.indptr[r_id + 1]]
+            row = r_hat_final.data[r_hat_final.indptr[r_id]:
+                                   r_hat_final.indptr[r_id + 1]]
             sorted_row_idx = row.argsort()[:-5]
             row[sorted_row_idx] = 0
         r_hat_final.eliminate_zeros()
@@ -91,34 +92,36 @@ def main():
         r_hat_final = r_hat_final.tolil()
 
     user_counter = 0
-    for pl_id in recs.keys():
-        if user_counter % 100 == 0:
-            print('.', end='', flush=True)
-            logging.info(' ' + str(user_counter))
-        pl_index = ds.playlist_id_mapper[pl_id]
-        pl_row = r_hat_final.data[r_hat_final.indptr[pl_index]:r_hat_final.indptr[pl_index + 1]]
-        for i in range(0, pl_row.shape[0]):
-            track_index = r_hat_final.indeces[r_hat_final.indptr[pl_index] + i]
-            track_id = ds.get_track_id_from_index(track_index)
-            candidate = Recommendation()
-            candidate.rating = pl_row[i]
-            candidate.track_id = track_id
-            min_rec = min(recs[pl_id])
-            if candidate > min_rec:
-                recs[pl_id][recs[pl_id].index(min_rec)] = candidate
-        user_counter += 1
-    print('\n', end='', flush=True)
+    r_hat_final = r_hat_final.tocsr()
     with open('submission.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()
         for pl_id in recs.keys():
+            if user_counter % 10 == 0:
+                print('.', end='', flush=True)
+                logging.info(' ' + str(user_counter))
+            pl_index = ds.playlist_id_mapper[pl_id]
+            pl_row = r_hat_final.data[r_hat_final.indptr[pl_index]:
+                                      r_hat_final.indptr[pl_index + 1]]
+            if pl_row.shape[0] != 5:
+                print(('Warning: playlist row has ' +
+                       pl_row.shape[0] + ' tracks...'))
+                logging.info(('Warning: playlist row has ' +
+                              pl_row.shape[0] + ' tracks...'))
+            top_5 = []
+            for i in range(0, pl_row.shape[0]):
+                t_index = r_hat_final.indices[r_hat_final.indptr[pl_index] + i]
+                track_id = ds.get_track_id_from_index(t_index)
+                top_5.append(track_id)
+            top_5.sort(reverse=True)
             track_ids = ''
-            recs[pl_id].sort(reverse=True)
-            for rec in recs[pl_id]:
-                track_ids = track_ids + rec.track_id + ' '
+            for r in top_5:
+                track_ids = track_ids + r + ' '
             writer.writerow({'playlist_id': pl_id,
                              'track_ids': track_ids[:-1]})
+            user_counter += 1
+        print('\n', end='', flush=True)
 
 
 if __name__ == '__main__':
