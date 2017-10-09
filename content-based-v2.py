@@ -93,7 +93,7 @@ def main():
                 r_hat[urm_chunk.nonzero()] = 0
                 r_hat.eliminate_zeros()
                 print('  Chunked r_hat evaluated...\n',
-                      '  Concatenating to final r_hat...  ', end='')
+                      '  Concatenating to final r_hat...  ')
                 logging.info('  Chunked r_hat evaluated...\n' +
                              '  Concatenating to final r_hat...  ')
                 r_hat_final[:, chunk:end] = r_hat
