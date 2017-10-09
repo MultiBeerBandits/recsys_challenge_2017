@@ -1,4 +1,4 @@
-from loader import *
+from loader_v2 import *
 from test import get_norm_urm, Recommendation
 from scipy.sparse import *
 import numpy as np
@@ -20,6 +20,9 @@ def build_recs_dict(dataset):
     return recs
 
 
+H = 10
+
+
 def main():
     ds = Dataset()
     icm = ds.build_icm('./data/tracks_final.csv')
@@ -29,7 +32,7 @@ def main():
     norm = np.sqrt(icm_csr.multiply(icm_csr).sum(0))
     print('  Norm done...')
     logging.info('  Norm done...')
-    icm_bar = icm_csr.multiply(csr_matrix(1 / norm))
+    icm_bar = icm_csr.multiply(csr_matrix(1 / (norm + H)))
     print('  Matrix normalized evaluated...')
     logging.info(' Matrix normalized evaluated...')
     c = icm_bar
@@ -37,6 +40,7 @@ def main():
     chunksize = 1000
     mat_len = c_t.shape[0]
     r_hat_final = lil_matrix((ds.playlists_number, ds.tracks_number))
+    urm = ds.build_train_matrix().tocsr()
     for chunk in range(0, mat_len, chunksize):
         if chunk + chunksize > mat_len:
             end = mat_len
@@ -48,26 +52,23 @@ def main():
                str(chunk) + ', ' + str(end) + ') ...'))
         logging.info('Building cosine similarity matrix for [' +
                      str(chunk) + ', ' + str(end) + ') ...')
-        if os.path.isfile(name):
-            S_prime = load_sparse_matrix(name)
-        else:
-            sim = c_t[chunk:chunk + chunksize].tocsr().dot(c)
-            M_s = ds.build_target_tracks_mask(chunk, end).tocsr()
-            S_prime = sim.multiply(M_s).tocsr()
-            S_prime.eliminate_zeros()
-            save_sparse_matrix(name, S_prime)
-        r_bar, user_bias, item_bias = get_norm_urm(ds)
-        r_bar = r_bar.tocsr()
-        r_hat = r_bar.dot(S_prime.transpose()).tocsr()
+        # if os.path.isfile(name):
+        #    S_prime = load_sparse_matrix(name)
+        # else:
+        sim = c_t[chunk:chunk + chunksize].tocsr().dot(c)
+        M_s = ds.build_target_tracks_mask(chunk, end).tocsr()
+        S_prime = sim.multiply(M_s).tocsr()
+        S_prime.eliminate_zeros()
+        # save_sparse_matrix(name, S_prime)
+        r_hat = urm.dot(S_prime.transpose()).tocsr()
         print('  Un-normalized r_hat evaluated...')
         logging.info('  Un-normalized r_hat evaluated...')
-        urm = ds.build_train_matrix().tocsr()
         mean_norm = csr_matrix(urm.dot(S_prime.transpose()))
         print('  Mean-Norm evaluated...')
         logging.info('  Mean-Norm evaluated...')
-        c = r_hat / mean_norm
-        c[np.isnan(c)] = 0
-        r_hat = csr_matrix(c)
+        r_hat = r_hat / mean_norm
+        r_hat[np.isnan(r_hat)] = 0
+        r_hat = csr_matrix(r_hat)
         print('  Normalized r_hat evaluated...')
         logging.info('  Normalized r_hat evaluated...')
         urm_chunk = urm[:, chunk:end].tocsr()
@@ -97,7 +98,7 @@ def main():
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()
-        for pl_id in recs.keys():
+        for pl_id in ds.target_playlists.keys():
             if user_counter % 10 == 0:
                 print('.', end='', flush=True)
                 logging.info(' ' + str(user_counter))
@@ -113,11 +114,11 @@ def main():
             for i in range(0, pl_row.shape[0]):
                 t_index = r_hat_final.indices[r_hat_final.indptr[pl_index] + i]
                 track_id = ds.get_track_id_from_index(t_index)
-                top_5.append(track_id)
-            top_5.sort(reverse=True)
+                top_5.append([track_id, pl_row[i]])
+            top_5.sort(key=lambda x: x[1], reverse=True)
             track_ids = ''
             for r in top_5:
-                track_ids = track_ids + r + ' '
+                track_ids = track_ids + r[0] + ' '
             writer.writerow({'playlist_id': pl_id,
                              'track_ids': track_ids[:-1]})
             user_counter += 1
