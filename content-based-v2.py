@@ -79,7 +79,7 @@ def main():
                     M_s = ds.build_target_tracks_mask(chunk, end).tocsr()
                     S_prime = sim.multiply(M_s).tocsr()
                     S_prime.eliminate_zeros()
-                    save_sparse_matrix(name, S_prime)
+                    # save_sparse_matrix(name, S_prime)
                 r_hat = current_r_bar.dot(S_prime.transpose()).tocsr()
                 print('  Un-normalized r_hat evaluated...')
                 logging.info('  Un-normalized r_hat evaluated...')
