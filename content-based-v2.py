@@ -41,7 +41,7 @@ def main():
     chunksize = 1000
     mat_len = c_t.shape[0]
     recs = build_recs_dict(ds)
-    playlist_chunksize = 100
+    playlist_chunksize = 2000
     r_bar, user_bias, item_bias = get_norm_urm(ds)
     r_bar = r_bar.tocsr()
     # create the correct subset of urm. select rows
