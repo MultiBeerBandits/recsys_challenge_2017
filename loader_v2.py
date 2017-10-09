@@ -70,41 +70,37 @@ class Dataset():
         self.duration_weight = weights[2]
         self.playcount_weight = weights[3]
 
-        if not os.path.isfile('./data/icm_tracks_csr.npz'):
-            icm = lil_matrix((self.attrs_number, self.tracks_number))
-            with open(path, newline='') as csv_file:
-                reader = csv.DictReader(csv_file, delimiter='\t')
-                for row in reader:
-                    # get index of this track
-                    track_index = self.track_id_mapper[row['track_id']]
-                    # set attributes in icm
-                    artist_id = row['artist_id']
-                    artist_index = self.track_attr_mapper['artist_id'][row['artist_id']]
-                    icm[artist_index, track_index] = self.artist_weight
-                    # albums
-                    albums = parse_csv_array(row['album'])
-                    for album in albums:
-                        album_index = self.track_attr_mapper['album'][album]
-                        icm[album_index, track_index] = self.album_weight
-                    # duration
-                    duration = row['duration']
-                    if duration is not None and duration != '' and float(duration) != -1:
-                        duration = float(duration) - self.min_duration
-                        duration_offset = min(int(duration / self.duration_int), self.duration_intervals - 1)
-                        duration_index = self.track_attr_mapper['duration'] + \
-                            duration_offset
-                        icm[duration_index, track_index] = self.duration_weight
-                    # playcount
-                    playcount = row['playcount']
-                    if playcount is not None and playcount != '' and float(playcount) != -1:
-                        playcount = float(playcount) - self.min_playcount
-                        playcount_offset = min(int(playcount / self.playcount_int), self.playcount_intervals - 1)
-                        playcount_index = self.track_attr_mapper['playcount'] + \
-                            playcount_offset
-                        icm[playcount_index, track_index] = self.playcount_weight
-            save_sparse_matrix('./data/icm_tracks_csr.npz', icm)
-        else:
-            icm = load_sparse_matrix('./data/icm_tracks_csr.npz')
+        icm = lil_matrix((self.attrs_number, self.tracks_number))
+        with open(path, newline='') as csv_file:
+            reader = csv.DictReader(csv_file, delimiter='\t')
+            for row in reader:
+                # get index of this track
+                track_index = self.track_id_mapper[row['track_id']]
+                # set attributes in icm
+                artist_id = row['artist_id']
+                artist_index = self.track_attr_mapper['artist_id'][row['artist_id']]
+                icm[artist_index, track_index] = self.artist_weight
+                # albums
+                albums = parse_csv_array(row['album'])
+                for album in albums:
+                    album_index = self.track_attr_mapper['album'][album]
+                    icm[album_index, track_index] = self.album_weight
+                # duration
+                duration = row['duration']
+                if duration is not None and duration != '' and float(duration) != -1:
+                    duration = float(duration) - self.min_duration
+                    duration_offset = min(int(duration / self.duration_int), self.duration_intervals - 1)
+                    duration_index = self.track_attr_mapper['duration'] + \
+                        duration_offset
+                    icm[duration_index, track_index] = self.duration_weight
+                # playcount
+                playcount = row['playcount']
+                if playcount is not None and playcount != '' and float(playcount) != -1:
+                    playcount = float(playcount) - self.min_playcount
+                    playcount_offset = min(int(playcount / self.playcount_int), self.playcount_intervals - 1)
+                    playcount_index = self.track_attr_mapper['playcount'] + \
+                        playcount_offset
+                    icm[playcount_index, track_index] = self.playcount_weight
         return icm
 
     def build_train_matrix(self, filename='csr_urm.npz'):
