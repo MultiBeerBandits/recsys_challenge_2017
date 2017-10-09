@@ -5,6 +5,11 @@ import numpy as np
 import os.path
 import logging
 
+# write log to file, filemode = 'w' tells to write each time a new file
+logging.basicConfig(filename='cbf.log',
+                    format='%(asctime)s %(message)s',
+                    filemode='w',
+                    level=logging.DEBUG)
 
 class ContentBasedFiltering(object):
 
