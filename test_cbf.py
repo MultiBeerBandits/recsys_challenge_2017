@@ -41,7 +41,7 @@ def main():
                         out_file.write(to_write)
                         out_file.flush()
                     # export csv
-                    cbf_exporter = ContentBasedFiltering()
+                    cbf_exporter = ContentBasedFiltering(weight_list)
                     urm = ds.build_train_matrix()
                     tg_playlist = list(ds.target_playlists.keys())
                     tg_tracks = list(ds.target_tracks.keys())
