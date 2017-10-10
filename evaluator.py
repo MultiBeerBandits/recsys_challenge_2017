@@ -40,13 +40,13 @@ class Evaluator(object):
 
         # get the size of training set
         training_set_size = sum(
-            [1 for x in train_dataset.values() if len(x) >= min_playlist_size])
+            [1 for x in train_dataset.values() if len(x) >= self.min_playlist_size])
 
         fold_size = math.ceil(training_set_size / folds)
 
         # get the playlist with at least min_playlist_size elements
         playlists = [x for x in train_dataset.keys() if len(
-            train_dataset[x]) >= min_playlist_size]
+            train_dataset[x]) >= self.min_playlist_size]
 
         # shuffle the list of playlists
         random.shuffle(playlists)
