@@ -1,26 +1,26 @@
-from scipy.sparse import *
 import random
 import math
 
 
 class Evaluator(object):
 
-    # for each fold the dictionary of predictions
-    test_dictionaries = []
+    def __init__(self):
+        # for each fold the dictionary of predictions
+        self.test_dictionaries = []
 
-    # target tracks is a list of lists, for each fold its target tracks
-    target_tracks = []
+        # target tracks is a list of lists, for each fold its target tracks
+        self.target_tracks = []
 
-    # min number of tracks for playlists
-    min_playlist_size = 10
+        # min number of tracks for playlists
+        self.min_playlist_size = 10
 
-    # starts from -1 since get_fold adds 1 at the beginning
-    current_fold_index = -1
+        # starts from -1 since get_fold adds 1 at the beginning
+        self.current_fold_index = -1
 
-    # evaluation for each fold
-    evaluations = []
+        # evaluation for each fold
+        self.evaluations = []
 
-    folds = 0
+        self.folds = 0
 
     def cross_validation(self, folds, train_dataset):
         """
@@ -40,7 +40,8 @@ class Evaluator(object):
 
         # get the size of training set
         training_set_size = sum(
-            [1 for x in train_dataset.values() if len(x) >= self.min_playlist_size])
+            [1 for x in train_dataset.values()
+             if len(x) >= self.min_playlist_size])
 
         fold_size = math.ceil(training_set_size / folds)
 
@@ -77,8 +78,7 @@ class Evaluator(object):
         and target playlist
         """
         self.current_fold_index = self.current_fold_index + 1
-        urm = dataset.build_train_matrix()
-        current_fold = urm.copy()
+        current_fold = dataset.build_train_matrix().copy()
         for k in self.test_dictionaries[self.current_fold_index].keys():
             playlist_index = dataset.get_playlist_index_from_id(k)
             for track in self.test_dictionaries[self.current_fold_index][k]:
@@ -109,7 +109,6 @@ class Evaluator(object):
                 len(self.test_dictionaries[self.current_fold_index].keys())
             print("MAP@5: " + str(map_at_five))
             self.evaluations[self.current_fold_index] = map_at_five
-
 
     def get_mean_map(self):
         """
