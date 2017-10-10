@@ -106,7 +106,7 @@ class Evaluator(object):
                     item_number += 1
                 cumulated_ap = cumulated_ap + ap
             map_at_five = cumulated_ap / \
-                len(test_dictionaries[self.current_fold_index].keys())
+                len(self.test_dictionaries[self.current_fold_index].keys())
             print("MAP@5: " + str(map_at_five))
             self.evaluations[self.current_fold_index] = map_at_five
 
