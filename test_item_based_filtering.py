@@ -1,7 +1,7 @@
 from loader_v2 import *
 from scipy.sparse import *
 import evaluator
-from local_user_based import *
+from item_based_filtering import *
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
         ds = Dataset()
         ev = evaluator.Evaluator()
         ev.cross_validation(5, ds.train_final.copy())
-        ubf = UserBasedFiltering()
+        ubf = ItemBasedFiltering()
         for i in range(0, 5):
             urm, tg_tracks, tg_playlist = ev.get_fold(ds)
             ubf.fit(urm, tg_playlist, tg_tracks, ds, shr)
@@ -32,7 +32,7 @@ def main():
         ds = Dataset()
         ev = evaluator.Evaluator()
         ev.cross_validation(5, ds.train_final.copy())
-        ubf = UserBasedFiltering()
+        ubf = ItemBasedFiltering()
         for i in range(0, 5):
             urm, tg_tracks, tg_playlist = ev.get_fold(ds)
             ubf.fit(urm, tg_playlist, tg_tracks, ds, best_shrinkage, k_f)
@@ -49,7 +49,7 @@ def main():
            str(best_k_filtering) + ']'))
 
     # export csv
-    ubf_exporter = UserBasedFiltering()
+    ubf_exporter = ItemBasedFiltering()
     urm = ds.build_train_matrix()
     tg_playlist = list(ds.target_playlists.keys())
     tg_tracks = list(ds.target_tracks.keys())
