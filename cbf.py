@@ -118,9 +118,9 @@ class ContentBasedFiltering(object):
                                       r_hat_final.indptr[pl_index + 1]]
             if pl_row.shape[0] != 5:
                 print(('Warning: playlist row has ' +
-                       pl_row.shape[0] + ' tracks...'))
+                       str(pl_row.shape[0]) + ' tracks...'))
                 logging.info(('Warning: playlist row has ' +
-                              pl_row.shape[0] + ' tracks...'))
+                              str(pl_row.shape[0]) + ' tracks...'))
             top_5 = []
             for i in range(0, pl_row.shape[0]):
                 t_index = r_hat_final.indices[r_hat_final.indptr[pl_index] + i]

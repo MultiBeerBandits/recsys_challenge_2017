@@ -78,7 +78,7 @@ class Evaluator(object):
         """
         self.current_fold_index = self.current_fold_index + 1
         urm = dataset.build_train_matrix()
-        current_fold = urm
+        current_fold = urm.copy()
         for k in self.test_dictionaries[self.current_fold_index].keys():
             playlist_index = dataset.get_playlist_index_from_id(k)
             for track in self.test_dictionaries[self.current_fold_index][k]:
