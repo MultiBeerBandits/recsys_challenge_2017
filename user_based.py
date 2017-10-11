@@ -36,6 +36,10 @@ class UserBasedFiltering(object):
         S_num = urm.dot(urm.transpose())
         S = S_num.multiply(csr_matrix(1 / norm))
         S = S.multiply(csr_matrix(1 / norm.T))
+        # zero out diagonal
+        # in the diagonal there is the sim between i and i (1)
+        S.setdiag(0)
+        S.eliminate_zeros()
         # keep only rows of target playlist
         S = S[[dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)

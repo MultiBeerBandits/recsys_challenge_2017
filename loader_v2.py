@@ -56,20 +56,12 @@ class Dataset():
         self.duration_weight = 0.2
         self.playcount_weight = 0.2
 
-    def build_icm(self, path, weights):
+    def build_icm(self, path='./data/tracks_final.csv'):
         """
         returns the item content matrix using mappers defined in dataset class
         icm matrix encoded as follows:
         AxI (A is the number of attributes and I is the number of items)
-        weight is a list of attribute weights
-        0: artist, 1: album, 2: duration, 3: playcount
         """
-        # initialize attribute weights
-        self.artist_weight = weights[0]
-        self.album_weight = weights[1]
-        self.duration_weight = weights[2]
-        self.playcount_weight = weights[3]
-
         icm = lil_matrix((self.attrs_number, self.tracks_number))
         with open(path, newline='') as csv_file:
             reader = csv.DictReader(csv_file, delimiter='\t')
@@ -89,7 +81,8 @@ class Dataset():
                 duration = row['duration']
                 if duration is not None and duration != '' and float(duration) != -1:
                     duration = float(duration) - self.min_duration
-                    duration_offset = min(int(duration / self.duration_int), self.duration_intervals - 1)
+                    duration_offset = min(
+                        int(duration / self.duration_int), self.duration_intervals - 1)
                     duration_index = self.track_attr_mapper['duration'] + \
                         duration_offset
                     icm[duration_index, track_index] = self.duration_weight
@@ -97,7 +90,8 @@ class Dataset():
                 playcount = row['playcount']
                 if playcount is not None and playcount != '' and float(playcount) != -1:
                     playcount = float(playcount) - self.min_playcount
-                    playcount_offset = min(int(playcount / self.playcount_int), self.playcount_intervals - 1)
+                    playcount_offset = min(
+                        int(playcount / self.playcount_int), self.playcount_intervals - 1)
                     playcount_index = self.track_attr_mapper['playcount'] + \
                         playcount_offset
                     icm[playcount_index, track_index] = self.playcount_weight
