@@ -55,15 +55,17 @@ class ContentBasedFiltering(object):
             print(('Building cosine similarity matrix for [' +
                    str(chunk) + ', ' + str(end) + ') ...'))
             S[chunk:end] = icm_t[chunk:end].tocsr().dot(icm)
-        S = S.tocsr()
         print("Similarity matrix ready, let's normalize it!")
         # zero out diagonal
         # in the diagonal there is the sim between i and i (1)
+        # maybe it's better to have a lil matrix here
         S.setdiag(0)
-        S.eliminate_zeros()
-        # keep only target rows of URM
+        S = S.tocsr()
+        # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
+        urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
+                           for x in self.tr_id_list]]
         # apply shrinkage factor:
         # Let I_uv be the set of attributes in common of item i and j
         # Let H be the shrinkage factor
@@ -75,8 +77,7 @@ class ContentBasedFiltering(object):
         shr_num = S
         shr_den = S.copy()
         shr_den.data += shrinkage
-        shr_den = 1 / shr_den.todense()
-        shr_den[(shr_den == 0)] = 1
+        shr_den.data = 1 / shr_den.data
         S = S.multiply(shr_num)
         S = csr_matrix(S.multiply(shr_den))
         # Top-K filtering.
