@@ -8,7 +8,7 @@ def main():
     best_map = 0
     best_shrinkage = 0
     best_k_filtering = 0
-    for shr in range(10, 150, 10):
+    for shr in range(30, 100, 10):
         for k_f in range(20, 100, 5):
             ds = Dataset()
             ev = evaluator.Evaluator()

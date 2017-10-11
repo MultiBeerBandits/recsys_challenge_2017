@@ -13,23 +13,23 @@ logging.basicConfig(filename='cbf.log',
 
 class ContentBasedFiltering(object):
 
-    H = 10
+    self.H = 10
     # final matrix of predictions
-    R_hat = None
+    self.R_hat = None
 
     # for keeping reference between playlist and row index
-    pl_id_list = []
+    self.pl_id_list = []
     # for keeping reference between tracks and column index
-    tr_id_list = []
+    self.tr_id_list = []
 
-    tr_number = 0
+    self.tr_number = 0
 
     # dataset object
-    ds = None
+    self.ds = None
 
     # list of weights associated to attribute values
     # artist, album, duration, playcount
-    weights = list()
+    self.weights = list()
 
     def __init__(self, weights):
         self.weights = weights

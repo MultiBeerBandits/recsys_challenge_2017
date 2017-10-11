@@ -14,7 +14,7 @@ class ItemBasedFiltering():
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=60, k_filtering=50):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=85):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -97,3 +97,9 @@ class ItemBasedFiltering():
             tracks_ids = [self.tr_id_list[x] for x in track_cols]
             recs[pl_id] = tracks_ids
         return recs
+
+    def get_model(self):
+        """
+        Returns the complete R_hat
+        """
+        return self.R_hat.copy()

@@ -132,7 +132,7 @@ class Dataset():
             print(self.urm.shape)
             # serialize it to path
             save_sparse_matrix(path, self.urm)
-        return self.urm
+        return self.urm.copy()
 
     def get_track_id_from_index(self, index):
         return self.track_index_mapper[index]
