@@ -42,7 +42,7 @@ def main():
                      best_shrinkage,
                      best_k_filtering)
     recs = ibf_exporter.predict()
-    with open('submission_ubf.csv', mode='w', newline='') as out:
+    with open('submission_ibf.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()

@@ -105,7 +105,8 @@ class Evaluator(object):
                         precision = relevant_items / item_number
                         ap = ap + precision
                     item_number += 1
-                cumulated_ap = cumulated_ap + ap
+                # should ap be divided by 5?????
+                cumulated_ap = cumulated_ap + (ap / 5)
             map_at_five = cumulated_ap / \
                 len(self.test_dictionaries[self.current_fold_index].keys())
             print("MAP@5: " + str(map_at_five))
