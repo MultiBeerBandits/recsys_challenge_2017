@@ -28,7 +28,7 @@ class ContentBasedFiltering(object):
 
         self.pl_id_list = list(target_playlist)
         self.tr_id_list = list(target_tracks)
-        S = lil_matrix((len(target_tracks), dataset.tracks_number))
+        S = None
         print("target playlist ", len(self.pl_id_list))
         print("target tracks ", len(self.tr_id_list))
         # get ICM from dataset, assume it already cleaned
@@ -54,13 +54,42 @@ class ContentBasedFiltering(object):
                 end = chunk + chunksize
             print(('Building cosine similarity matrix for [' +
                    str(chunk) + ', ' + str(end) + ') ...'))
-            S[chunk:end] = icm_t[chunk:end].tocsr().dot(icm)
+            # First compute similarity
+            S_prime = icm_t[chunk:end].tocsr().dot(icm)
+            print("S_prime prime built.")
+            # compute common features
+            icm_t_ones = icm_t[chunk:end]
+            icm_t_ones[icm_t_ones.nonzero()] = 1
+            icm_ones = icm.copy()
+            icm_ones[icm_ones.nonzero()] = 1
+            S_num = icm_t_ones.dot(icm_ones)
+            S_den = S_num.copy()
+            S_den.data += shrinkage
+            S_den.data = 1 / S_den.data
+            S_prime = S_prime.multiply(S_num).multiply(S_den)
+            print("S_prime applied shrinkage")
+            # Top-K filtering.
+            # We only keep the top K similarity weights to avoid considering many
+            # barely-relevant neighbors
+            for row_i in range(0, S_prime.shape[0]):
+                row = S_prime.data[S_prime.indptr[row_i]:S_prime.indptr[row_i + 1]]
+
+                sorted_idx = row.argsort()[:-k_filtering]
+                row[sorted_idx] = 0
+
+            print("S_prime filtered")
+            S_prime.eliminate_zeros()
+            if S is None:
+                S = S_prime
+            else:
+                # stack matrices vertically
+                S = vstack([S, S_prime], format="csr")
         print("Similarity matrix ready, let's normalize it!")
         # zero out diagonal
         # in the diagonal there is the sim between i and i (1)
         # maybe it's better to have a lil matrix here
         S.setdiag(0)
-        S = S.tocsr()
+        S.eliminate_zeros()
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
@@ -72,21 +101,13 @@ class ContentBasedFiltering(object):
         # Obtaining I_uv / I_uv + H
         # Rationale:
         # if I_uv is high H has no importante, otherwise has importance
-        shr_num = S
-        shr_den = S.copy()
-        shr_den.data += shrinkage
-        shr_den.data = 1 / shr_den.data
-        S = S.multiply(shr_num)
-        S = csr_matrix(S.multiply(shr_den))
-        # Top-K filtering.
-        # We only keep the top K similarity weights to avoid considering many
-        # barely-relevant neighbors
-        for row_i in range(0, S.shape[0]):
-            row = S.data[S.indptr[row_i]:S.indptr[row_i + 1]]
-
-            sorted_idx = row.argsort()[:-k_filtering]
-            row[sorted_idx] = 0
-        S.eliminate_zeros()
+        # shr_num = S.copy()
+        # shr_num[shr_num.nonzero()] = 1
+        # shr_den = shr_num.copy()
+        # shr_den.data += shrinkage
+        # shr_den.data = 1 / shr_den.data
+        # S = S.multiply(shr_num)
+        # S = csr_matrix(S.multiply(shr_den))
         # get a column vector of the similarities of item i (i is the row)
         s_norm = S.sum(axis=1)
         # normalize s
@@ -96,7 +117,7 @@ class ContentBasedFiltering(object):
         print("R_hat done")
         # apply mask for eliminating already rated items
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
-                           for x in self.tr_id_list]]
+                                      for x in self.tr_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
         # eliminate playlist that are not target, already done, to check
