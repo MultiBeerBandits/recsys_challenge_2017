@@ -15,10 +15,10 @@ def main():
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         cbf.fit(urm, tg_playlist, tg_tracks, ds)
-        recs = ibf.predict()
+        recs = cbf.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
-    print("MAP@5 [Shrinkage = " + str(shr) +  ' K_f ' + str(k_f) + ']', map_at_five)
+    print("MAP@5 :", map_at_five)
 
 
 if __name__ == '__main__':

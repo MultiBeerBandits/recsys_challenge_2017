@@ -64,8 +64,6 @@ class ContentBasedFiltering(object):
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
-        urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
-                           for x in self.tr_id_list]]
         # apply shrinkage factor:
         # Let I_uv be the set of attributes in common of item i and j
         # Let H be the shrinkage factor
@@ -97,6 +95,8 @@ class ContentBasedFiltering(object):
         R_hat = urm_cleaned.dot(S.transpose()).tocsr()
         print("R_hat done")
         # apply mask for eliminating already rated items
+        urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
+                           for x in self.tr_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
         # eliminate playlist that are not target, already done, to check
