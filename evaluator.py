@@ -116,3 +116,21 @@ class Evaluator(object):
         Returns the mean map computed over each fold
         """
         return sum(self.evaluations) / self.folds
+
+    def evaluate_playlist(self, recommendation):
+        """
+        Returns the avg precision of this playlist
+        """
+        # avg precision
+        ap = 0
+        item_number = 1
+        relevant_items = 0
+        pl_id = list(recommendation.keys())[0]
+        for tr_id in recommendation[pl_id]:
+            if tr_id in self.test_dictionaries[self.current_fold_index][pl_id]:
+                relevant_items += 1
+                precision = relevant_items / item_number
+                ap = ap + precision
+            item_number += 1
+        return ap / 5
+        # should ap be divided by 5?????
