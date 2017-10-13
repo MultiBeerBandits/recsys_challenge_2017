@@ -14,14 +14,14 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=130, k_filtering=95):
+    def fit(self, urm, target_playlist, target_tracks, dataset, album_w=1.0, artist_w=1.0, shrinkage=130, k_filtering=95):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
         target_tracks is a list of track id
         shrinkage: shrinkage factor for significance weighting
         S = ICM' ICM
-        R = URM S 
+        R = URM S
         In between eliminate useless row of URM and useless cols of S
         """
         # initialization
@@ -32,7 +32,7 @@ class ContentBasedFiltering(object):
         print("target playlist ", len(self.pl_id_list))
         print("target tracks ", len(self.tr_id_list))
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm()
+        icm = dataset.build_icm(album_weight=album_w, artist_weight=artist_w)
         # calculate similarity between items:
         # S_ij=(sum for k belonging to attributes t_ik*t_jk)/norm_i * norm_k
         # first calculate norm

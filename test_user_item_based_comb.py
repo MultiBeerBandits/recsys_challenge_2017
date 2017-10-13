@@ -12,9 +12,9 @@ def main():
     best_map = 0
     best_user_w = 0
     best_item_w = 0
+    ds = Dataset()
     for user_w in np.arange(0.0, 1.0, 0.1):
         item_w = 1 - user_w
-        ds = Dataset()
         ev = evaluator.Evaluator()
         ev.cross_validation(5, ds.train_final.copy())
         ubf = UserBasedFiltering()

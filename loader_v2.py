@@ -53,10 +53,10 @@ class Dataset():
         # weights of attributes
         self.artist_weight = 1
         self.album_weight = 1
-        self.duration_weight = 0.3
-        self.playcount_weight = 0.3
+        self.duration_weight = 0
+        self.playcount_weight = 0
 
-    def build_icm(self, path='./data/tracks_final.csv'):
+    def build_icm(self, album_weight=1.0, artist_weight=1.0, path='./data/tracks_final.csv'):
         """
         returns the item content matrix using mappers defined in dataset class
         icm matrix encoded as follows:
@@ -71,12 +71,12 @@ class Dataset():
                 # set attributes in icm
                 artist_id = row['artist_id']
                 artist_index = self.track_attr_mapper['artist_id'][row['artist_id']]
-                icm[artist_index, track_index] = self.artist_weight
+                icm[artist_index, track_index] = artist_weight
                 # albums
                 albums = parse_csv_array(row['album'])
                 for album in albums:
                     album_index = self.track_attr_mapper['album'][album]
-                    icm[album_index, track_index] = self.album_weight
+                    icm[album_index, track_index] = album_weight
                 # duration
                 duration = row['duration']
                 if duration is not None and duration != '' and float(duration) != -1:

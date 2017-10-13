@@ -53,8 +53,7 @@ class UserBasedFiltering(object):
         shr_num = S
         shr_den = S.copy()
         shr_den.data += shrinkage
-        shr_den = 1 / shr_den.todense()
-        shr_den[(shr_den == 0)] = 1
+        shr_den.data = 1 / shr_den.data
         S = S.multiply(shr_num)
         S = csr_matrix(S.multiply(shr_den))
         # Top-K filtering.
