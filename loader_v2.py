@@ -53,8 +53,8 @@ class Dataset():
         # weights of attributes
         self.artist_weight = 1
         self.album_weight = 1
-        self.duration_weight = 0
-        self.playcount_weight = 0
+        self.duration_weight = 0.2
+        self.playcount_weight = 0.2
 
     def build_icm(self, album_weight=1.0, artist_weight=1.0, path='./data/tracks_final.csv'):
         """
