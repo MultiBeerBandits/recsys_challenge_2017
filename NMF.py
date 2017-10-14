@@ -36,7 +36,7 @@ class NMF():
             U_prime = u_num / u_den
             U_prime = np.multiply(U_prime, self.U)
             U_prime[(U_prime < 0)] = 0
-            self.U = U_prime
+
             print(('[NMF][Fit with u_reg = ' + str(u_reg) +
                    ', v_reg = ' + str(v_reg) +
                    '] User factor matrix updated...'))
@@ -52,6 +52,7 @@ class NMF():
             v_num = np.multiply(v_num, self.V)
             v_num[(v_num < 0)] = 0
             self.V = v_num
+            self.U = U_prime
             print(('[NMF][Fit with u_reg = ' + str(u_reg) +
                    ', v_reg = ' + str(v_reg) +
                    '] Item factor matrix updated...'))

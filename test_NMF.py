@@ -10,8 +10,8 @@ def main():
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        nmf = NMF(urm, features=100, learning_steps=1000)
-        nmf.fit(0.02, 0.02)
+        nmf = NMF(urm, features=100, learning_steps=10000)
+        nmf.fit(1e-6, 1e-6)
         recs = nmf.predict(list(tg_playlist), list(tg_tracks), ds)
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()

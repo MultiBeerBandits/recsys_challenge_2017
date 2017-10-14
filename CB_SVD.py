@@ -2,6 +2,7 @@ from loader_v2 import *
 from scipy.sparse import *
 from scipy.sparse.linalg import svds
 import numpy as np
+import numpy.linalg as LA
 
 
 class ContentBasedFiltering(object):
@@ -36,65 +37,55 @@ class ContentBasedFiltering(object):
         icm = dataset.build_icm(album_weight=album_w, artist_weight=artist_w)
         # Apply SVD on ICM
         _, _, icm = svds(icm, features, return_singular_vectors='vh')
+
+        print("SVD Done!")
         # calculate similarity between items:
         # S_ij=(sum for k belonging to attributes t_ik*t_jk)/norm_i * norm_k
         # first calculate norm
-        # sum over rows (obtaining a row vector)
-        norm = np.sqrt(icm.sum(axis=0))
+        # norm over rows (obtaining a row vector)
+        norm = LA.norm(icm, axis=0)
         norm[(norm == 0)] = 1
         # normalize
         icm = np.multiply(icm, np.reciprocal(norm))
+        print("Normalization done!")
         icm_t = icm.transpose()
         # clean the transposed matrix, we do not need tracks not target
         icm_t = icm_t[[dataset.get_track_index_from_id(x)
                        for x in self.tr_id_list]]
-        chunksize = 1000
-        icm = csr_matrix(icm)
-        icm_t = csr_matrix(icm_t)
-        mat_len = icm_t.shape[0]
-        for chunk in range(0, mat_len, chunksize):
-            if chunk + chunksize > mat_len:
-                end = mat_len
-            else:
-                end = chunk + chunksize
-            print(('Building cosine similarity matrix for [' +
-                   str(chunk) + ', ' + str(end) + ') ...'))
-            # First compute similarity
-            S_prime = icm_t[chunk:end].tocsr().dot(icm)
-            print("S_prime prime built.")
-            # compute common features
-            icm_t_ones = icm_t[chunk:end]
-            icm_t_ones[icm_t_ones.nonzero()] = 1
-            icm_ones = icm.copy()
-            icm_ones[icm_ones.nonzero()] = 1
-            S_num = icm_t_ones.dot(icm_ones)
-            S_den = S_num.copy()
-            S_den.data += shrinkage
-            S_den.data = 1 / S_den.data
-            S_prime = S_prime.multiply(S_num).multiply(S_den)
-            print("S_prime applied shrinkage")
-            # Top-K filtering.
-            # We only keep the top K similarity weights to avoid considering many
-            # barely-relevant neighbors
-            for row_i in range(0, S_prime.shape[0]):
-                row = S_prime.data[S_prime.indptr[row_i]:S_prime.indptr[row_i + 1]]
+        S_prime = icm_t.dot(icm)
+        print("S prime computed")
 
-                sorted_idx = row.argsort()[:-k_filtering]
-                row[sorted_idx] = 0
+        # compute common features
+        icm_t_ones = icm_t
+        icm_t_ones[icm_t.nonzero()] = 1
+        icm_ones = icm
+        icm_ones[icm_ones.nonzero()] = 1
+        S_num = icm_t_ones.dot(icm_ones)
+        S_den = S_num.copy()
+        S_den += shrinkage
+        S_den = np.reciprocal(S_den)
+        S_prime = np.multiply(S_prime, S_num)
+        S_prime = np.multiply(S_prime, S_den)
+        print("S_prime applied shrinkage")
+        indeces = np.argpartition(S_prime, S_prime.shape[1] - k_filtering, axis=1)[0: S_prime.shape[1] - k_filtering]
+        S_prime[indeces] = 0
+        S_prime = csr_matrix(S_prime)
+        # Top-K filtering.
+        # We only keep the top K similarity weights to avoid considering many
+        # barely-relevant neighbors
+        # for row_i in range(0, S_prime.shape[0]):
+        #     row = S_prime.data[S_prime.indptr[row_i]:S_prime.indptr[row_i + 1]]
 
-            print("S_prime filtered")
-            S_prime.eliminate_zeros()
-            if S is None:
-                S = S_prime
-            else:
-                # stack matrices vertically
-                S = vstack([S, S_prime], format="csr")
+        #     sorted_idx = row.argsort()[:-k_filtering]
+        #     row[sorted_idx] = 0
+
+        print("S_prime filtered")
         print("Similarity matrix ready, let's normalize it!")
         # zero out diagonal
         # in the diagonal there is the sim between i and i (1)
         # maybe it's better to have a lil matrix here
+        S = S_prime
         S.setdiag(0)
-        S.eliminate_zeros()
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
@@ -116,13 +107,15 @@ class ContentBasedFiltering(object):
         # get a column vector of the similarities of item i (i is the row)
         s_norm = S.sum(axis=1)
         # normalize s
-        S = S.multiply(csr_matrix(1 / s_norm))
+        S = S.multiply(np.reciprocal(s_norm))
         # compute ratings
         R_hat = urm_cleaned.dot(S.transpose()).tocsr()
         print("R_hat done")
         # apply mask for eliminating already rated items
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
                                       for x in self.tr_id_list]]
+        print(urm_cleaned.shape)
+        print(R_hat.shape)
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
         # eliminate playlist that are not target, already done, to check

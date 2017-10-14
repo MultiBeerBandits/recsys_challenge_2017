@@ -15,10 +15,8 @@ def main():
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         xbf.fit(urm, tg_playlist, tg_tracks, ds)
-        for playlist in tg_playlist:           
-            recs = xbf.predict_one(playlist)
-            map = ev.evaluate_playlist(recs)
-            print("MAP@5 :", map)
+        recs = xbf.predict()
+        ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
     print("MAP@5 :", map_at_five)
 
