@@ -10,20 +10,20 @@ def main():
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        nmf = NMF(urm, features=100, learning_steps=10000)
+        nmf = NMF(urm, features=150, learning_steps=10000)
         nmf.fit(1e-6, 1e-6)
         recs = nmf.predict(list(tg_playlist), list(tg_tracks), ds)
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
-    print("MAP@5 [Features = 100, Iterations: 1000] ", map_at_five)
+    print("MAP@5 [Features = 100, Iterations: 10000] ", map_at_five)
 
     # export csv
     urm = ds.build_train_matrix()
-    nmf_exporter = NMF(urm, features=100, learning_steps=1000)
+    nmf_exporter = NMF(urm, features=150, learning_steps=10000)
     tg_playlist = list(ds.target_playlists.keys())
     tg_tracks = list(ds.target_tracks.keys())
     # Train the model with the best shrinkage found in cross-validation
-    nmf_exporter.fit(0.02, 0.02)
+    nmf_exporter.fit(1e-6, 1e-6)
     recs = nmf_exporter.predict(tg_playlist, tg_tracks, ds)
     with open('submission_nmf.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']

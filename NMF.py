@@ -56,6 +56,11 @@ class NMF():
             print(('[NMF][Fit with u_reg = ' + str(u_reg) +
                    ', v_reg = ' + str(v_reg) +
                    '] Item factor matrix updated...'))
+            if i%100 == 0:
+                error_m = self.urm - self.U.dot(self.V.transpose())
+                error_m = np.square(error_m)
+                error = np.sum(error_m)
+                print("Train error", error)
 
     def predict(self, target_playlist, target_tracks, dataset, at=5):
         self.U = self.U[[dataset.get_playlist_index_from_id(x)
