@@ -55,6 +55,11 @@ class NMF():
             print(('[NMF][Fit with u_reg = ' + str(u_reg) +
                    ', v_reg = ' + str(v_reg) +
                    '] Item factor matrix updated...'))
+            print(('[NMF][Fit with u_reg = ' + str(u_reg) +
+                   ', v_reg = ' + str(v_reg) +
+                   '] First U and V rows:'))
+            print(self.U[(self.U != 0)][:self.features])
+            print(self.V[(self.V != 0)][:self.features])
 
     def predict(self, target_playlist, target_tracks, dataset, at=5):
         self.U = self.U[[dataset.get_playlist_index_from_id(x)
@@ -66,7 +71,7 @@ class NMF():
         self.urm = self.urm[:, [dataset.get_track_index_from_id(x)
                                 for x in target_tracks]]
         R_hat = self.U.dot(self.V.transpose())
-        R_hat[(self.urm != 1)] = 0
+        R_hat[self.urm.nonzero()] = 0
         R_hat = csr_matrix(R_hat)
         recs = {}
         for row_i in range(R_hat.shape[0]):
