@@ -1,7 +1,7 @@
 from src.utils.loader import *
 from scipy.sparse import *
 import numpy as np
-import scipy.linalg as la
+import numpy.linalg as la
 
 
 class ContentBasedFiltering(object):
@@ -15,7 +15,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=130, k_filtering=95):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=95):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -32,6 +32,7 @@ class ContentBasedFiltering(object):
         S = None
         print("target playlist ", len(self.pl_id_list))
         print("target tracks ", len(self.tr_id_list))
+        print("SHAPE of URM: ", urm.shape)
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm()
         # calculate similarity between items:
@@ -39,7 +40,7 @@ class ContentBasedFiltering(object):
         # first calculate norm
         # sum over rows (obtaining a row vector)
         print("Calculating norm")
-        norm = la.norm(icm, axis=0)
+        norm = la.norm(icm.todense(), axis=0)
         print("Calculated norm")
         norm[(norm == 0)] = 1
         # normalize
@@ -61,15 +62,15 @@ class ContentBasedFiltering(object):
             S_prime = icm_t[chunk:end].tocsr().dot(icm)
             print("S_prime prime built.")
             # compute common features
-            # icm_t_ones = icm_t[chunk:end]
-            # icm_t_ones[icm_t_ones.nonzero()] = 1
-            # icm_ones = icm.copy()
-            # icm_ones[icm_ones.nonzero()] = 1
-            # S_num = icm_t_ones.dot(icm_ones)
-            # S_den = S_num.copy()
-            # S_den.data += shrinkage
-            # S_den.data = np.reciprocal(S_den.data)
-            # S_prime = S_prime.multiply(S_num).multiply(S_den)
+            icm_t_ones = icm_t[chunk:end]
+            icm_t_ones[icm_t_ones.nonzero()] = 1
+            icm_ones = icm.copy()
+            icm_ones[icm_ones.nonzero()] = 1
+            S_num = icm_t_ones.dot(icm_ones)
+            S_den = S_num.copy()
+            S_den.data += shrinkage
+            S_den.data = np.reciprocal(S_den.data)
+            S_prime = S_prime.multiply(S_num).multiply(S_den)
             print("S_prime applied shrinkage")
             # Top-K filtering.
             # We only keep the top K similarity weights to avoid considering many
