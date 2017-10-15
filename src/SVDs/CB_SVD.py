@@ -1,4 +1,4 @@
-from loader_v2 import *
+from src.utils.loader import *
 from scipy.sparse import *
 from scipy.sparse.linalg import svds
 import numpy as np
@@ -67,8 +67,9 @@ class ContentBasedFiltering(object):
         S_prime = np.multiply(S_prime, S_num)
         S_prime = np.multiply(S_prime, S_den)
         print("S_prime applied shrinkage")
-        indeces = np.argpartition(S_prime, S_prime.shape[1] - k_filtering, axis=1)[0: S_prime.shape[1] - k_filtering]
-        S_prime[indeces] = 0
+        indices = np.argpartition(S_prime, S_prime.shape[1] - k_filtering, axis=1)[:, :-k_filtering] # keep all rows but until k columns
+        for i in range(S_prime.shape[0]):
+            S_prime[i, indices[i]] = 0
         S_prime = csr_matrix(S_prime)
         # Top-K filtering.
         # We only keep the top K similarity weights to avoid considering many

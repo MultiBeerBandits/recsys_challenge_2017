@@ -1,8 +1,8 @@
-from loader_v2 import *
+from src.utils.loader import *
 from scipy.sparse import *
-import evaluator
+from src.utils.evaluator import *
 import numpy as np
-from content_based_filtering import *
+from src.CBF.content_based_filtering import *
 from itertools import product
 
 
@@ -17,7 +17,7 @@ def main():
     ds = Dataset()
     for alb_w, art_w, in product(album,
                                  artist):
-        ev = evaluator.Evaluator()
+        ev = Evaluator()
         ev.cross_validation(5, ds.train_final.copy())
         cbf = ContentBasedFiltering()
         for i in range(0, 5):

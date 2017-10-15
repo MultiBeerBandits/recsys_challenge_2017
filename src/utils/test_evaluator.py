@@ -1,5 +1,5 @@
-from loader import Dataset
-from evaluator import *
+from src.utils.loader import Dataset
+from src.utils.evaluator import *
 import random
 
 def main():

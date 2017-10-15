@@ -1,6 +1,7 @@
-from loader_v2 import *
+from src.utils.loader import *
 from scipy.sparse import *
 import numpy as np
+import numpy.linalg as la
 
 
 class ContentBasedFiltering(object):
@@ -14,7 +15,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, album_w=1.0, artist_w=1.0, shrinkage=130, k_filtering=95):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=130, k_filtering=95):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -32,15 +33,15 @@ class ContentBasedFiltering(object):
         print("target playlist ", len(self.pl_id_list))
         print("target tracks ", len(self.tr_id_list))
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm(album_weight=album_w, artist_weight=artist_w)
+        icm = dataset.build_icm()
         # calculate similarity between items:
         # S_ij=(sum for k belonging to attributes t_ik*t_jk)/norm_i * norm_k
         # first calculate norm
         # sum over rows (obtaining a row vector)
-        norm = np.sqrt(icm.sum(axis=0))
+        norm = la.norm(icm, axis=0)
         norm[(norm == 0)] = 1
         # normalize
-        icm = icm.multiply(csr_matrix(1 / norm))
+        icm = icm.multiply(csr_matrix(np.reciprocal(norm)))
         icm_t = icm.transpose()
         # clean the transposed matrix, we do not need tracks not target
         icm_t = icm_t[[dataset.get_track_index_from_id(x)
@@ -58,15 +59,15 @@ class ContentBasedFiltering(object):
             S_prime = icm_t[chunk:end].tocsr().dot(icm)
             print("S_prime prime built.")
             # compute common features
-            icm_t_ones = icm_t[chunk:end]
-            icm_t_ones[icm_t_ones.nonzero()] = 1
-            icm_ones = icm.copy()
-            icm_ones[icm_ones.nonzero()] = 1
-            S_num = icm_t_ones.dot(icm_ones)
-            S_den = S_num.copy()
-            S_den.data += shrinkage
-            S_den.data = 1 / S_den.data
-            S_prime = S_prime.multiply(S_num).multiply(S_den)
+            # icm_t_ones = icm_t[chunk:end]
+            # icm_t_ones[icm_t_ones.nonzero()] = 1
+            # icm_ones = icm.copy()
+            # icm_ones[icm_ones.nonzero()] = 1
+            # S_num = icm_t_ones.dot(icm_ones)
+            # S_den = S_num.copy()
+            # S_den.data += shrinkage
+            # S_den.data = np.reciprocal(S_den.data)
+            # S_prime = S_prime.multiply(S_num).multiply(S_den)
             print("S_prime applied shrinkage")
             # Top-K filtering.
             # We only keep the top K similarity weights to avoid considering many
@@ -93,25 +94,9 @@ class ContentBasedFiltering(object):
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
-        # apply shrinkage factor:
-        # Let I_uv be the set of attributes in common of item i and j
-        # Let H be the shrinkage factor
-        #   Multiply element-wise for the matrix of I_uv (ie: the sim matrix)
-        #   Divide element-wise for the matrix of I_uv incremented by H
-        # Obtaining I_uv / I_uv + H
-        # Rationale:
-        # if I_uv is high H has no importante, otherwise has importance
-        # shr_num = S.copy()
-        # shr_num[shr_num.nonzero()] = 1
-        # shr_den = shr_num.copy()
-        # shr_den.data += shrinkage
-        # shr_den.data = 1 / shr_den.data
-        # S = S.multiply(shr_num)
-        # S = csr_matrix(S.multiply(shr_den))
-        # get a column vector of the similarities of item i (i is the row)
         s_norm = S.sum(axis=1)
         # normalize s
-        S = S.multiply(csr_matrix(1 / s_norm))
+        S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
         # compute ratings
         R_hat = urm_cleaned.dot(S.transpose()).tocsr()
         print("R_hat done")

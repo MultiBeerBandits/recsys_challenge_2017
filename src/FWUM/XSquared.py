@@ -1,6 +1,5 @@
-from loader_v2 import *
+from src.utils.loader import *
 from scipy.sparse import *
-import evaluator
 import numpy as np
 import numpy.linalg as LA
 

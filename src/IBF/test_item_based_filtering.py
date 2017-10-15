@@ -1,23 +1,23 @@
-from loader_v2 import *
+from src.utils.loader import *
 from scipy.sparse import *
-import evaluator
-from user_based import *
+from src.utils.evaluator import *
+from src.IBF.item_based_filtering import *
 
 
 def main():
     best_map = 0
     best_shrinkage = 0
     best_k_filtering = 0
-    for shr in range(10, 150, 10):
+    for shr in range(30, 100, 10):
         for k_f in range(20, 100, 5):
             ds = Dataset()
-            ev = evaluator.Evaluator()
+            ev = Evaluator()
             ev.cross_validation(5, ds.train_final.copy())
-            ubf = UserBasedFiltering()
+            ibf = ItemBasedFiltering()
             for i in range(0, 5):
                 urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-                ubf.fit(urm, tg_playlist, tg_tracks, ds, shr, k_f)
-                recs = ubf.predict()
+                ibf.fit(urm, tg_playlist, tg_tracks, ds, shr, k_f)
+                recs = ibf.predict()
                 ev.evaluate_fold(recs)
             map_at_five = ev.get_mean_map()
             print("MAP@5 [Shrinkage = " + str(shr) +  ' K_f ' + str(k_f) + ']', map_at_five)
@@ -26,25 +26,23 @@ def main():
                 best_map = map_at_five
                 best_shrinkage = shr
                 best_k_filtering = k_f
-
     print(('Best MAP@5 = ' + str(best_map) +
-           ' [Shrinkage factor:' + str(best_shrinkage) + ', K_filtering: ' +
-           str(best_k_filtering) + ']'))
-
+           ' [Shrinkage factor:' + str(best_shrinkage) +
+           ', K_f ' + str(best_k_filtering) + ']'))
     # export csv
-    ubf_exporter = UserBasedFiltering()
+    ibf_exporter = ItemBasedFiltering()
     urm = ds.build_train_matrix()
     tg_playlist = list(ds.target_playlists.keys())
     tg_tracks = list(ds.target_tracks.keys())
     # Train the model with the best shrinkage found in cross-validation
-    ubf_exporter.fit(urm,
+    ibf_exporter.fit(urm,
                      tg_playlist,
                      tg_tracks,
                      ds,
                      best_shrinkage,
                      best_k_filtering)
-    recs = ubf_exporter.predict()
-    with open('submission_user_based_filtering.csv', mode='w', newline='') as out:
+    recs = ibf_exporter.predict()
+    with open('submission_ibf.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()

@@ -1,7 +1,7 @@
-from loader_v2 import *
+from src.utils.loader import *
 from scipy.sparse import *
-import evaluator
-from NMF import *
+from src.utils.evaluator import *
+from src.MF.NMF import *
 
 
 def main():

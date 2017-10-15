@@ -1,6 +1,6 @@
-from loader_v2 import *
+from src.utils.loader import *
 from scipy.sparse import *
-import evaluator
+from src.utils.evaluator import *
 from XSquared import *
 
 
@@ -9,7 +9,7 @@ def main():
     best_shrinkage = 0
     best_k_filtering = 0
     ds = Dataset()
-    ev = evaluator.Evaluator()
+    ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     xbf = xSquared()
     for i in range(0, 5):

@@ -10,9 +10,11 @@ class Dataset():
     A Dataset contains useful structures for accessing tracks and playlists
     """
 
-    def __init__(self):
+    def __init__(self, load_tags=False):
+        # Load_tags is true if need to load tags
         # prefix of data folder
         self.prefix = './data/'
+        self.load_tags = load_tags
         # initialization of user rating matrix
         self.urm = None
         # Initialize clusters for duration and playcount
@@ -26,7 +28,7 @@ class Dataset():
         # track_attr_mapper maps attributes to row index
         # format: {'artist_id': {'artist_key': row_index}}
         self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number = build_tracks_mappers(
-            self.prefix + 'tracks_final.csv', self)
+            self.prefix + 'tracks_final.csv', self, load_tags)
         # build playlist mappers
         # playlist_id_mapper maps playlist id to columns of ucm
         # format: {'item_id': column_index}
@@ -53,10 +55,18 @@ class Dataset():
         # weights of attributes
         self.artist_weight = 1
         self.album_weight = 1
-        self.duration_weight = 0.2
-        self.playcount_weight = 0.2
+        self.duration_weight = 1
+        self.playcount_weight = 1
+        self.tags_weight = 1
 
-    def build_icm(self, album_weight=1.0, artist_weight=1.0, path='./data/tracks_final.csv'):
+    def set_track_attr_weights(self, art_w, alb_w, dur_w, playcount_w, tags_w):
+        self.artist_weight = art_w
+        self.album_weight = alb_w
+        self.duration_weight = dur_w
+        self.playcount_weight = playcount_w
+        self.tags_weight = tags_w
+
+    def build_icm(self, path='./data/tracks_final.csv'):
         """
         returns the item content matrix using mappers defined in dataset class
         icm matrix encoded as follows:
@@ -71,12 +81,19 @@ class Dataset():
                 # set attributes in icm
                 artist_id = row['artist_id']
                 artist_index = self.track_attr_mapper['artist_id'][row['artist_id']]
-                icm[artist_index, track_index] = artist_weight
+                icm[artist_index, track_index] = self.artist_weight
                 # albums
                 albums = parse_csv_array(row['album'])
                 for album in albums:
                     album_index = self.track_attr_mapper['album'][album]
-                    icm[album_index, track_index] = album_weight
+                    icm[album_index, track_index] = self.album_weight
+                # load tags only if specified
+                if self.load_tags:
+                    # tags
+                    tags = parse_csv_array(row['tags'])
+                    for tag in tags:
+                        tag_index = self.track_attr_mapper['tags'][tag]
+                        icm[tag_index, track_index] = self.tags_weight
                 # duration
                 duration = row['duration']
                 if duration is not None and duration != '' and float(duration) != -1:
@@ -176,7 +193,7 @@ def load_csv(path, dict_id):
     return data
 
 
-def build_tracks_mappers(path, dataset):
+def build_tracks_mappers(path, dataset, load_tags=False):
     """
     Build the mappers of tracks
     """
@@ -227,7 +244,8 @@ def build_tracks_mappers(path, dataset):
             track_index += 1
     # is a dictionary of dictionary
     # for each attrbute a dictionary of keys of attribute and their index
-    mapper = {'artist_id': {}, 'album': {}, 'duration': 0, 'playcount': 0}
+    mapper = {'artist_id': {}, 'album': {},
+              'tags': {}, 'duration': 0, 'playcount': 0}
     attr_index = 0
     for v in attrs['artist_id']:
         mapper['artist_id'][v] = attr_index
@@ -235,6 +253,11 @@ def build_tracks_mappers(path, dataset):
     for v in attrs['album']:
         mapper['album'][v] = attr_index
         attr_index += 1
+    # load tags only if specified
+    if load_tags:
+        for v in attrs['tags']:
+            mapper['tags'][v] = attr_index
+            attr_index += 1
     # compute ranges
     dataset.duration_int = (max_duration - min_duration) / \
         dataset.duration_intervals

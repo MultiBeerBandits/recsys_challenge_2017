@@ -1,14 +1,14 @@
-from loader_v2 import *
+from src.utils.loader import *
 from scipy.sparse import *
-import evaluator
+from src.utils.evaluator import *
 import numpy as np
-from CB_SVD import *
+from src.SVDs.CB_SVD import *
 from itertools import product
 
 
 def main():
     ds = Dataset()
-    ev = evaluator.Evaluator()
+    ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
     for i in range(0, 5):
@@ -18,9 +18,9 @@ def main():
                 ds,
                 album_w=1.0,
                 artist_w=1.0,
-                shrinkage=100,
-                k_filtering=50,
-                features=100)
+                shrinkage=50,
+                k_filtering=100,
+                features=500)
         recs = cbf.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
