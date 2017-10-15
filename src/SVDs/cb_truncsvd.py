@@ -16,7 +16,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=100, k_filtering=95, features=5000):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=100, k_filtering=95, features=2500):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -51,11 +51,11 @@ class ContentBasedFiltering(object):
         # normalize
         icm = np.multiply(icm, np.reciprocal(norm))
         print("Normalization done!")
-        icm_t = icm.transpose().toarray()
+        icm_t = icm.transpose()
         # clean the transposed matrix, we do not need tracks not target
         icm_t = icm_t[[dataset.get_track_index_from_id(x)
                        for x in self.tr_id_list]]
-        S_prime = icm_t.dot(icm.toarray())
+        S_prime = icm_t.dot(icm)
         print("S prime computed")
 
         # compute common features

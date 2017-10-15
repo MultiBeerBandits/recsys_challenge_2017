@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 def main():
-    ds = Dataset(load_tags=True, filter_tag = True)
+    ds = Dataset(load_tags=True, filter_tag=True)
     icm = ds.build_icm()
     # get a column vector with the sum of each attribute
     # for each attribute its frequency in the icm

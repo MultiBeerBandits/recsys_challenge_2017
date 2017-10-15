@@ -20,6 +20,7 @@ class Dataset():
         # Initialize clusters for duration and playcount
         self.duration_intervals = 10
         self.playcount_intervals = 10
+        self.pop_threshold = 100
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}
@@ -266,9 +267,14 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     # load tags only if specified and only if higher than pop threshold
     if load_tags:
         for v in attrs['tags']:
-            if tag_counter[v] > pop_threshold:
+            if filter_tag:
+                if tag_counter[v] > dataset.pop_threshold:
+                    mapper['tags'][v] = attr_index
+                    attr_index += 1
+            else:
                 mapper['tags'][v] = attr_index
                 attr_index += 1
+
     # compute ranges
     dataset.duration_int = (max_duration - min_duration) / \
         dataset.duration_intervals

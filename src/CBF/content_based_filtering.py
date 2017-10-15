@@ -38,6 +38,7 @@ class ContentBasedFiltering(object):
         # S_ij=(sum for k belonging to attributes t_ik*t_jk)/norm_i * norm_k
         # first calculate norm
         # sum over rows (obtaining a row vector)
+        print("Calculating norm")
         norm = la.norm(icm, axis=0)
         print("Calculated norm")
         norm[(norm == 0)] = 1
