@@ -10,7 +10,7 @@ class Dataset():
     A Dataset contains useful structures for accessing tracks and playlists
     """
 
-    def __init__(self, load_tags=False):
+    def __init__(self, load_tags=False, filter_tag=False):
         # Load_tags is true if need to load tags
         # prefix of data folder
         self.prefix = './data/'
@@ -28,7 +28,7 @@ class Dataset():
         # track_attr_mapper maps attributes to row index
         # format: {'artist_id': {'artist_key': row_index}}
         self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number = build_tracks_mappers(
-            self.prefix + 'tracks_final.csv', self, load_tags)
+            self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
         # build playlist mappers
         # playlist_id_mapper maps playlist id to columns of ucm
         # format: {'item_id': column_index}
@@ -92,8 +92,9 @@ class Dataset():
                     # tags
                     tags = parse_csv_array(row['tags'])
                     for tag in tags:
-                        tag_index = self.track_attr_mapper['tags'][tag]
-                        icm[tag_index, track_index] = self.tags_weight
+                        if tag in self.track_attr_mapper['tags']:
+                            tag_index = self.track_attr_mapper['tags'][tag]
+                            icm[tag_index, track_index] = self.tags_weight
                 # duration
                 duration = row['duration']
                 if duration is not None and duration != '' and float(duration) != -1:
@@ -193,13 +194,15 @@ def load_csv(path, dict_id):
     return data
 
 
-def build_tracks_mappers(path, dataset, load_tags=False):
+def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     """
     Build the mappers of tracks
     """
     # attrs is a dict that contains for every attribute its different values
     # used for mappers
     attrs = {'artist_id': set(), 'album': set(), 'tags': set()}
+    # used for couting frequency of each tag. key is the tag, value is the frequency
+    tag_counter = {}
     # mapper from track id to column index. key is track id value is column
     track_id_mapper = {}
     # mapper from index to track id. key is column, value is id
@@ -211,6 +214,7 @@ def build_tracks_mappers(path, dataset, load_tags=False):
     max_playcount = 0
     min_duration = 224000
     max_duration = 224000
+    pop_threshold = 1000
     with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file, delimiter='\t')
         for row in reader:
@@ -221,6 +225,10 @@ def build_tracks_mappers(path, dataset, load_tags=False):
             tags = parse_csv_array(row['tags'])
             for tag in tags:
                 attrs['tags'].add(tag)
+                if tag in tag_counter:
+                    tag_counter[tag] += 1
+                else:
+                    tag_counter[tag] = 1
             track_id_mapper[row['track_id']] = track_index
             track_index_mapper[track_index] = row['track_id']
             # duration
@@ -242,6 +250,8 @@ def build_tracks_mappers(path, dataset, load_tags=False):
                     if playcount > max_playcount:
                         max_playcount = playcount
             track_index += 1
+    # set tag counter
+    dataset.tag_counter = tag_counter
     # is a dictionary of dictionary
     # for each attrbute a dictionary of keys of attribute and their index
     mapper = {'artist_id': {}, 'album': {},
@@ -253,11 +263,12 @@ def build_tracks_mappers(path, dataset, load_tags=False):
     for v in attrs['album']:
         mapper['album'][v] = attr_index
         attr_index += 1
-    # load tags only if specified
+    # load tags only if specified and only if higher than pop threshold
     if load_tags:
         for v in attrs['tags']:
-            mapper['tags'][v] = attr_index
-            attr_index += 1
+            if tag_counter[v] > pop_threshold:
+                mapper['tags'][v] = attr_index
+                attr_index += 1
     # compute ranges
     dataset.duration_int = (max_duration - min_duration) / \
         dataset.duration_intervals

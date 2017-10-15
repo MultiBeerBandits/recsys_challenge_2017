@@ -7,7 +7,7 @@ from itertools import product
 
 
 def main():
-    ds = Dataset(load_tags=True)
+    ds = Dataset(load_tags=True, filter_tag=True)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()

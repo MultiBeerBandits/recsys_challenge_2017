@@ -16,7 +16,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=100, k_filtering=95, features=1000):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=100, k_filtering=95, features=5000):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
