@@ -51,11 +51,11 @@ class ContentBasedFiltering(object):
         # normalize
         icm = np.multiply(icm, np.reciprocal(norm))
         print("Normalization done!")
-        icm_t = icm.transpose()
+        icm_t = icm.transpose().toarray()
         # clean the transposed matrix, we do not need tracks not target
         icm_t = icm_t[[dataset.get_track_index_from_id(x)
                        for x in self.tr_id_list]]
-        S_prime = icm_t.dot(icm)
+        S_prime = icm_t.dot(icm.toarray())
         print("S prime computed")
 
         # compute common features
