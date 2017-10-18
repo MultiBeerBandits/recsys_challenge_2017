@@ -106,3 +106,6 @@ ENV/
 
 # Mac stuff
 *.DS_STORE
+
+# idea stuff
+.idea/
