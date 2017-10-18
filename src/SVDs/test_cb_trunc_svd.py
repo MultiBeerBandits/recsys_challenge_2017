@@ -8,6 +8,7 @@ from itertools import product
 
 def main():
     ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()

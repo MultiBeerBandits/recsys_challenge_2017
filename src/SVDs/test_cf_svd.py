@@ -1,31 +1,42 @@
 from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
-from src.MF.NMF import *
+import numpy as np
+from src.SVDs.cf_svd import *
+from itertools import product
 
 
 def main():
-    ds = Dataset()
+    ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
+    cf = CollaborativeSVD()
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        nmf = NMF(urm, features=150, learning_steps=10000)
-        nmf.fit(1e-6, 1e-6)
-        recs = nmf.predict(list(tg_playlist), list(tg_tracks), ds)
+        cf.fit(urm, tg_playlist,
+                tg_tracks,
+                ds)
+        recs = cf.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
-    print("MAP@5 [Features = 100, Iterations: 10000] ", map_at_five)
+    print(("MAP@5 [shrinkage: " + str(100) +
+           " k_filtering: " + str(50) +
+           " album_w: " + str(1.0) +
+           " artist_w: " + str(1.0) + "]: "), map_at_five)
 
     # export csv
+    cf_exporter = CollaborativeSVD()
     urm = ds.build_train_matrix()
-    nmf_exporter = NMF(urm, features=150, learning_steps=10000)
     tg_playlist = list(ds.target_playlists.keys())
     tg_tracks = list(ds.target_tracks.keys())
     # Train the model with the best shrinkage found in cross-validation
-    nmf_exporter.fit(1e-6, 1e-6)
-    recs = nmf_exporter.predict(tg_playlist, tg_tracks, ds)
-    with open('submission_nmf.csv', mode='w', newline='') as out:
+    cf_exporter.fit(urm,
+                     tg_playlist,
+                     tg_tracks,
+                     ds)
+    recs = cbf_exporter.predict()
+    with open('submission_cbf.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()

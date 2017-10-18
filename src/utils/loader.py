@@ -20,7 +20,7 @@ class Dataset():
         # Initialize clusters for duration and playcount
         self.duration_intervals = 10
         self.playcount_intervals = 10
-        self.pop_threshold = 50
+        self.pop_threshold = 20
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}

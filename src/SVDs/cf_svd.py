@@ -1,11 +1,11 @@
 from src.utils.loader import *
 from scipy.sparse import *
-from sklearn.decomposition import TruncatedSVD
+from scipy.sparse.linalg import svds
 import numpy as np
 import numpy.linalg as LA
 
 
-class ContentBasedFiltering(object):
+class CollaborativeSVD(object):
 
     def __init__(self):
         # final matrix of predictions
@@ -16,7 +16,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=100, k_filtering=95, features=2500):
+    def fit(self, urm, target_playlist, target_tracks, dataset, album_w=1.0, artist_w=1.0, shrinkage=100, k_filtering=95, features=2500):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -33,14 +33,9 @@ class ContentBasedFiltering(object):
         S = None
         print("target playlist ", len(self.pl_id_list))
         print("target tracks ", len(self.tr_id_list))
-        # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm()
-        print("Initial shape of icm ", icm.shape)
-        # Apply SVD on ICM
-        svd = TruncatedSVD(n_components=features)
-        svd.fit(icm.transpose())
-        icm = svd.transform(icm.transpose()).transpose()
-        print("Shape of reduced icm: ", icm.shape)
+        # Apply SVD on URM and get the item features
+        _, _, icm = svds(urm, features, return_singular_vectors='vh')
+
         print("SVD Done!")
         # calculate similarity between items:
         # S_ij=(sum for k belonging to attributes t_ik*t_jk)/norm_i * norm_k
@@ -59,16 +54,16 @@ class ContentBasedFiltering(object):
         print("S prime computed")
 
         # compute common features
-        # icm_t_ones = icm_t
-        # icm_t_ones[icm_t.nonzero()] = 1
-        # icm_ones = icm
-        # icm_ones[icm_ones.nonzero()] = 1
-        # S_num = icm_t_ones.dot(icm_ones)
-        # S_den = S_num.copy()
-        # S_den += shrinkage
-        # S_den = np.reciprocal(S_den)
-        # S_prime = np.multiply(S_prime, S_num)
-        # S_prime = np.multiply(S_prime, S_den)
+        icm_t_ones = icm_t
+        icm_t_ones[icm_t.nonzero()] = 1
+        icm_ones = icm
+        icm_ones[icm_ones.nonzero()] = 1
+        S_num = icm_t_ones.dot(icm_ones)
+        S_den = S_num.copy()
+        S_den += shrinkage
+        S_den = np.reciprocal(S_den)
+        S_prime = np.multiply(S_prime, S_num)
+        S_prime = np.multiply(S_prime, S_den)
         print("S_prime applied shrinkage")
         indices = np.argpartition(S_prime, S_prime.shape[1] - k_filtering, axis=1)[:, :-k_filtering] # keep all rows but until k columns
         for i in range(S_prime.shape[0]):
@@ -77,11 +72,11 @@ class ContentBasedFiltering(object):
         # Top-K filtering.
         # We only keep the top K similarity weights to avoid considering many
         # barely-relevant neighbors
-        # for row_i in range(0, S_prime.shape[0]):
-        #     row = S_prime.data[S_prime.indptr[row_i]:S_prime.indptr[row_i + 1]]
+        for row_i in range(0, S_prime.shape[0]):
+            row = S_prime.data[S_prime.indptr[row_i]:S_prime.indptr[row_i + 1]]
 
-        #     sorted_idx = row.argsort()[:-k_filtering]
-        #     row[sorted_idx] = 0
+            sorted_idx = row.argsort()[:-k_filtering]
+            row[sorted_idx] = 0
 
         print("S_prime filtered")
         print("Similarity matrix ready, let's normalize it!")

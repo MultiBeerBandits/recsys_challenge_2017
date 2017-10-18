@@ -6,13 +6,13 @@ from src.MF.IALS import *
 
 def main():
     ds = Dataset()
-    ev = evaluator.Evaluator()
+    ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         ials = IALS(urm, features=50, learning_steps=5000)
         ials.fit(1e-6, 1e-6)
-        recs = nmf.predict(list(tg_playlist), list(tg_tracks), ds)
+        recs = ials.predict(list(tg_playlist), list(tg_tracks), ds)
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
     print("MAP@5 [Features = 100, Iterations: 10000] ", map_at_five)

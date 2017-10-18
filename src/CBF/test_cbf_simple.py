@@ -13,7 +13,7 @@ def main():
     shr_w = 100
     k_f = 50
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 1, 0.1, 0.1, 0.1)
+    ds.set_track_attr_weights(1, 1, 0.1, 0.1, 0.2)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
@@ -39,11 +39,7 @@ def main():
     cbf_exporter.fit(urm,
                      tg_playlist,
                      tg_tracks,
-                     ds,
-                     best_album_w,
-                     best_artist_w,
-                     shr_w,
-                     k_f)
+                     ds)
     recs = cbf_exporter.predict()
     with open('submission_cbf.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']

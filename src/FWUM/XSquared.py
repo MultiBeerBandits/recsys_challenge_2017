@@ -64,24 +64,26 @@ class xSquared():
         print("User feature matrix built done")
         # Feature weighting step
         # put to one each element in ufm
-        ufm_ones = ufm.copy()
-        ufm_ones[ufm.nonzero()] = 1
-        # first build IUF(f)
-        uf = ufm_ones.sum(axis=0)
-        uf_copy = uf.copy()
-        uf_copy[uf_copy == 0] = 1
-        iuf = np.reciprocal(uf_copy)
-        iuf[uf == 0] = 0
-        iuf = csr_matrix(iuf)
-        iuf.data = float(dataset.playlists_number) * iuf.data
-        iuf.data = np.log(iuf.data)
-        self.ufm = self.ufm.multiply(iuf)
+        # ufm_ones = ufm.copy()
+        # ufm_ones[ufm.nonzero()] = 1
+        # # first build IUF(f)
+        # uf = ufm_ones.sum(axis=0)
+        # uf_copy = uf.copy()
+        # uf_copy[uf_copy == 0] = 1
+        # iuf = np.reciprocal(uf_copy)
+        # iuf[uf == 0] = 0
+        # iuf = csr_matrix(iuf)
+        # iuf.data = float(dataset.playlists_number) * iuf.data
+        # iuf.data = np.log(iuf.data)
+        # self.ufm = self.ufm.multiply(iuf)
         print("Feature weighting done")
 
         # NEIGHBOR FORMATION
         # normalize matrix
-        norm = LA.norm(self.ufm, axis=1)
+        norm = LA.norm(self.ufm.todense(), axis=1)
         norm[norm == 0] = 1
+        print(norm.shape)
+        print(self.ufm.shape)
         self.ufm = self.ufm.multiply(csr_matrix(np.reciprocal(norm)))
         S = self.ufm.dot(self.ufm.transpose())
         # apply shrinkage factor:
@@ -92,13 +94,13 @@ class xSquared():
         # Obtaining I_uv / I_uv + H
         # Rationale:
         # if I_uv is high H has no importante, otherwise has importance
-        shr_num = S.copy()
-        shr_num[shr_num.nonzero()] = 1
-        shr_den = shr_num.copy()
-        shr_den.data += shrinkage
-        shr_den.data = np.reciprocal(shr_den.data)
-        S = S.multiply(shr_num)
-        S = csr_matrix(S.multiply(shr_den))
+        # shr_num = S.copy()
+        # shr_num[shr_num.nonzero()] = 1
+        # shr_den = shr_num.copy()
+        # shr_den.data += shrinkage
+        # shr_den.data = np.reciprocal(shr_den.data)
+        # S = S.multiply(shr_num)
+        # S = csr_matrix(S.multiply(shr_den))
         print("similarity done")
         S.setdiag(0)
         S.eliminate_zeros()

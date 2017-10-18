@@ -1,14 +1,14 @@
 from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
-from XSquared import *
+from src.FWUM.XSquared import *
 
 
 def main():
     best_map = 0
     best_shrinkage = 0
     best_k_filtering = 0
-    ds = Dataset()
+    ds = Dataset(load_tags=True, filter_tag=True)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     xbf = xSquared()
