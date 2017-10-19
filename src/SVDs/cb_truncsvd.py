@@ -89,7 +89,6 @@ class ContentBasedFiltering(object):
         # in the diagonal there is the sim between i and i (1)
         # maybe it's better to have a lil matrix here
         S = S_prime
-        S.setdiag(0)
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]

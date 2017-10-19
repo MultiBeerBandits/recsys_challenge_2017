@@ -6,5 +6,5 @@ setup(
     ext_modules=[
         Extension("IALS", ["IALS.c"],
                   include_dirs=[numpy.get_include()]),
-    ],
+    ]
 )

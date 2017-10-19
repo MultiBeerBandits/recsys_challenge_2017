@@ -7,7 +7,8 @@ from itertools import product
 
 
 def main():
-    ds = Dataset()
+    ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
@@ -15,12 +16,7 @@ def main():
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         cbf.fit(urm, tg_playlist,
                 tg_tracks,
-                ds,
-                album_w=1.0,
-                artist_w=1.0,
-                shrinkage=50,
-                k_filtering=100,
-                features=500)
+                ds)
         recs = cbf.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()

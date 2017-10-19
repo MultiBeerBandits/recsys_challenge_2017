@@ -16,7 +16,7 @@ class CollaborativeSVD(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, album_w=1.0, artist_w=1.0, shrinkage=100, k_filtering=95, features=2500):
+    def fit(self, urm, target_playlist, target_tracks, dataset, album_w=1.0, artist_w=1.0, shrinkage=100, k_filtering=95, features=1000):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -34,7 +34,7 @@ class CollaborativeSVD(object):
         print("target playlist ", len(self.pl_id_list))
         print("target tracks ", len(self.tr_id_list))
         # Apply SVD on URM and get the item features
-        _, _, icm = svds(urm, features, return_singular_vectors='vh')
+        _, s, icm = svds(urm, features, return_singular_vectors='vh')
 
         print("SVD Done!")
         # calculate similarity between items:
@@ -50,20 +50,21 @@ class CollaborativeSVD(object):
         # clean the transposed matrix, we do not need tracks not target
         icm_t = icm_t[[dataset.get_track_index_from_id(x)
                        for x in self.tr_id_list]]
-        S_prime = icm_t.dot(icm)
+        s = np.diag(np.square(s))
+        S_prime = icm_t.dot(s).dot(icm)
         print("S prime computed")
 
         # compute common features
-        icm_t_ones = icm_t
-        icm_t_ones[icm_t.nonzero()] = 1
-        icm_ones = icm
-        icm_ones[icm_ones.nonzero()] = 1
-        S_num = icm_t_ones.dot(icm_ones)
-        S_den = S_num.copy()
-        S_den += shrinkage
-        S_den = np.reciprocal(S_den)
-        S_prime = np.multiply(S_prime, S_num)
-        S_prime = np.multiply(S_prime, S_den)
+        # icm_t_ones = icm_t
+        # icm_t_ones[icm_t.nonzero()] = 1
+        # icm_ones = icm
+        # icm_ones[icm_ones.nonzero()] = 1
+        # S_num = icm_t_ones.dot(icm_ones)
+        # S_den = S_num.copy()
+        # S_den += shrinkage
+        # S_den = np.reciprocal(S_den)
+        # S_prime = np.multiply(S_prime, S_num)
+        # S_prime = np.multiply(S_prime, S_den)
         print("S_prime applied shrinkage")
         indices = np.argpartition(S_prime, S_prime.shape[1] - k_filtering, axis=1)[:, :-k_filtering] # keep all rows but until k columns
         for i in range(S_prime.shape[0]):
@@ -84,7 +85,6 @@ class CollaborativeSVD(object):
         # in the diagonal there is the sim between i and i (1)
         # maybe it's better to have a lil matrix here
         S = S_prime
-        S.setdiag(0)
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
@@ -113,8 +113,7 @@ class CollaborativeSVD(object):
         # apply mask for eliminating already rated items
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
                                       for x in self.tr_id_list]]
-        print(urm_cleaned.shape)
-        print(R_hat.shape)
+
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
         # eliminate playlist that are not target, already done, to check

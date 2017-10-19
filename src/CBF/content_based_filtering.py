@@ -101,7 +101,7 @@ class ContentBasedFiltering(object):
         # normalize s
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
         # compute ratings
-        R_hat = urm_cleaned.dot(S.transpose()).tocsr()
+        R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
         print("R_hat done")
         # apply mask for eliminating already rated items
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)

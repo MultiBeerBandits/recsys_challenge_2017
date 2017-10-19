@@ -16,7 +16,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, album_w=1.0, artist_w=1.0, shrinkage=100, k_filtering=95, features=100  ):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=100, k_filtering=95, features=1000):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -34,15 +34,17 @@ class ContentBasedFiltering(object):
         print("target playlist ", len(self.pl_id_list))
         print("target tracks ", len(self.tr_id_list))
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm(album_weight=album_w, artist_weight=artist_w)
+        icm = dataset.build_icm()
         # Apply SVD on ICM
-        _, _, icm = svds(icm, features, return_singular_vectors='vh')
+        _, s, icm = svds(icm, features, return_singular_vectors=True)
 
         print("SVD Done!")
         # calculate similarity between items:
         # S_ij=(sum for k belonging to attributes t_ik*t_jk)/norm_i * norm_k
         # first calculate norm
         # norm over rows (obtaining a row vector)
+        s = np.diag(s.data)
+        icm = s.dot(icm)
         norm = LA.norm(icm, axis=0)
         norm[(norm == 0)] = 1
         # normalize
@@ -52,20 +54,24 @@ class ContentBasedFiltering(object):
         # clean the transposed matrix, we do not need tracks not target
         icm_t = icm_t[[dataset.get_track_index_from_id(x)
                        for x in self.tr_id_list]]
+        # following SVD: S = V s^2 V'
+        #s.data = np.square(s.data)
+        # s = np.diag(s.data)
+        # S_prime = icm_t.dot(s)
+        print("S prime first step computed")
         S_prime = icm_t.dot(icm)
         print("S prime computed")
-
         # compute common features
-        icm_t_ones = icm_t
-        icm_t_ones[icm_t.nonzero()] = 1
-        icm_ones = icm
-        icm_ones[icm_ones.nonzero()] = 1
-        S_num = icm_t_ones.dot(icm_ones)
-        S_den = S_num.copy()
-        S_den += shrinkage
-        S_den = np.reciprocal(S_den)
-        S_prime = np.multiply(S_prime, S_num)
-        S_prime = np.multiply(S_prime, S_den)
+        # icm_t_ones = icm_t
+        # icm_t_ones[icm_t.nonzero()] = 1
+        # icm_ones = icm
+        # icm_ones[icm_ones.nonzero()] = 1
+        # S_num = icm_t_ones.dot(icm_ones)
+        # S_den = S_num.copy()
+        # S_den += shrinkage
+        # S_den = np.reciprocal(S_den)
+        # S_prime = np.multiply(S_prime, S_num)
+        # S_prime = np.multiply(S_prime, S_den)
         print("S_prime applied shrinkage")
         indices = np.argpartition(S_prime, S_prime.shape[1] - k_filtering, axis=1)[:, :-k_filtering] # keep all rows but until k columns
         for i in range(S_prime.shape[0]):
@@ -86,43 +92,23 @@ class ContentBasedFiltering(object):
         # in the diagonal there is the sim between i and i (1)
         # maybe it's better to have a lil matrix here
         S = S_prime
-        S.setdiag(0)
+        # S.setdiag(0)
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
-        # apply shrinkage factor:
-        # Let I_uv be the set of attributes in common of item i and j
-        # Let H be the shrinkage factor
-        #   Multiply element-wise for the matrix of I_uv (ie: the sim matrix)
-        #   Divide element-wise for the matrix of I_uv incremented by H
-        # Obtaining I_uv / I_uv + H
-        # Rationale:
-        # if I_uv is high H has no importante, otherwise has importance
-        # shr_num = S.copy()
-        # shr_num[shr_num.nonzero()] = 1
-        # shr_den = shr_num.copy()
-        # shr_den.data += shrinkage
-        # shr_den.data = 1 / shr_den.data
-        # S = S.multiply(shr_num)
-        # S = csr_matrix(S.multiply(shr_den))
         # get a column vector of the similarities of item i (i is the row)
         s_norm = S.sum(axis=1)
         # normalize s
         S = S.multiply(np.reciprocal(s_norm))
         # compute ratings
-        R_hat = urm_cleaned.dot(S.transpose()).tocsr()
+        R_hat = urm_cleaned.dot(S.transpose())
         print("R_hat done")
         # apply mask for eliminating already rated items
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
                                       for x in self.tr_id_list]]
-        print(urm_cleaned.shape)
-        print(R_hat.shape)
+
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
-        # eliminate playlist that are not target, already done, to check
-        #R_hat = R_hat[:, [dataset.get_track_index_from_id(
-        #    x) for x in self.tr_id_list]]
-        print("Shape of final matrix: ", R_hat.shape)
         self.R_hat = R_hat
 
     def predict(self, at=5):

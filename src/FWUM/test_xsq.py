@@ -5,10 +5,8 @@ from src.FWUM.XSquared import *
 
 
 def main():
-    best_map = 0
-    best_shrinkage = 0
-    best_k_filtering = 0
-    ds = Dataset(load_tags=True, filter_tag=True)
+    ds = Dataset()
+    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     xbf = xSquared()

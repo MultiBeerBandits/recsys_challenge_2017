@@ -19,7 +19,7 @@ cdef class IALS:
         # number of features of the latent factors
         self.features = features
 
-    cpdef fit(self, integral[:, ::1] urm, int n_iterations):
+    cpdef fit(self, urm, int n_iterations):
         self.X = np.random.rand(urm.shape[0], self.features)
         self.Y = np.ones((urm.shape[1], self.features))
         cdef int i, u
