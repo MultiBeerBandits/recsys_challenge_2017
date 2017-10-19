@@ -63,9 +63,7 @@ cdef class ExplicitCosine:
 
             # Apply top-k
             Si = Si.toarray().squeeze()
-            print(Si, Si.shape)
             sorted_idx = np.argpartition(Si, Si.shape[0] - self.top_k)[:-self.top_k]
-            print(sorted_idx)
             Si[sorted_idx] = 0
 
             # Merge Si into final similarity matrix
