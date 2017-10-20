@@ -27,6 +27,8 @@ cdef class ExplicitCosine:
         Xt_global = X.transpose()
 
         for i in range(n_users):
+            if i % 1000 == 0:
+                print(str(i) + '/' + str(n_users))
             row = X.getrow(i)
             # Mask of items rated by user i
             corated_m = (row != 0).transpose()
@@ -37,27 +39,25 @@ cdef class ExplicitCosine:
             i_norm = np.sqrt(row.multiply(row).sum(axis=1))
             i_norm[i_norm == 0] = 1
             i_norm = np.reciprocal(i_norm)
-            row = csr_matrix(row.multiply(i_norm))
+            row = row.multiply(i_norm)
 
             # Compute the norm of other users and divide the urm by it
             urm_norm = np.sqrt(Xt.multiply(Xt).sum(axis=0))
             urm_norm[urm_norm == 0] = 1
             urm_norm = np.reciprocal(urm_norm)
-            Xt = csr_matrix(Xt.multiply(urm_norm))
+            Xt = Xt.multiply(urm_norm)
 
             # Compute unshrinked similarity
-            Si = csr_matrix(row.dot(Xt))
+            Si = row.dot(Xt)
 
-            row_ones = row.copy()
-            row_ones[row_ones.nonzero()] = 1
-            Xt_ones = csr_matrix(Xt.copy())
+            Xt_ones = Xt.copy().tocsr()
             Xt_ones[Xt_ones.nonzero()] = 1
-            common = row_ones.dot(Xt_ones)
+            common = Xt_ones.sum(axis=0)
             # Apply numerator
             Si = Si.multiply(common)
 
-            common.data += self.shrinkage
-            common.data = 1 / common.data
+            common += self.shrinkage
+            common = np.reciprocal(common)
             # Apply denominator
             Si = Si.multiply(common)
 
@@ -69,4 +69,4 @@ cdef class ExplicitCosine:
             # Merge Si into final similarity matrix
             S[i] = Si
         S.setdiag(0)
-        return S.tocsr()
+        return csr_matrix(S)
