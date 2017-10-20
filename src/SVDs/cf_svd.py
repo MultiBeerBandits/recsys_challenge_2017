@@ -1,6 +1,7 @@
 from src.utils.loader import *
 from scipy.sparse import *
-from scipy.sparse.linalg import svds
+# from scipy.sparse.linalg import svds
+from sparsesvd import sparsesvd
 import numpy as np
 import numpy.linalg as LA
 
@@ -34,7 +35,7 @@ class CollaborativeSVD(object):
         print("target playlist ", len(self.pl_id_list))
         print("target tracks ", len(self.tr_id_list))
         # Apply SVD on URM and get the item features
-        _, s, icm = svds(urm, features, return_singular_vectors='vh')
+        u, s, icm = sparsesvd(urm, features, return_singular_vectors='vh')
 
         print("SVD Done!")
         # calculate similarity between items:

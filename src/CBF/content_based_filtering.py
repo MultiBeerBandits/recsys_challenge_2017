@@ -2,6 +2,7 @@ from src.utils.loader import *
 from scipy.sparse import *
 import numpy as np
 import numpy.linalg as la
+from sklearn.feature_extraction.text import TfidfTransformer
 
 
 class ContentBasedFiltering(object):
@@ -30,11 +31,13 @@ class ContentBasedFiltering(object):
         self.pl_id_list = list(target_playlist)
         self.tr_id_list = list(target_tracks)
         S = None
-        print("target playlist ", len(self.pl_id_list))
-        print("target tracks ", len(self.tr_id_list))
+        print("CBF started")
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm()
         print("SHAPE of ICM: ", icm.shape)
+        # apply tfidf
+        # transformer = TfidfTransformer()
+        # icm = transformer.fit_transform(icm.transpose()).transpose()
         # calculate similarity between items:
         # S_ij=(sum for k belonging to attributes t_ik*t_jk)/norm_i * norm_k
         # first calculate norm
@@ -62,15 +65,15 @@ class ContentBasedFiltering(object):
             S_prime = icm_t[chunk:end].tocsr().dot(icm)
             print("S_prime prime built.")
             # compute common features
-            # icm_t_ones = icm_t[chunk:end]
-            # icm_t_ones[icm_t_ones.nonzero()] = 1
-            # icm_ones = icm.copy()
-            # icm_ones[icm_ones.nonzero()] = 1
-            # S_num = icm_t_ones.dot(icm_ones)
-            # S_den = S_num.copy()
-            # S_den.data += shrinkage
-            # S_den.data = np.reciprocal(S_den.data)
-            # S_prime = S_prime.multiply(S_num).multiply(S_den)
+            icm_t_ones = icm_t[chunk:end]
+            icm_t_ones[icm_t_ones.nonzero()] = 1
+            icm_ones = icm.copy()
+            icm_ones[icm_ones.nonzero()] = 1
+            S_num = icm_t_ones.dot(icm_ones)
+            S_den = S_num.copy()
+            S_den.data += shrinkage
+            S_den.data = np.reciprocal(S_den.data)
+            S_prime = S_prime.multiply(S_num).multiply(S_den)
             print("S_prime applied shrinkage")
             # Top-K filtering.
             # We only keep the top K similarity weights to avoid considering many
@@ -92,8 +95,8 @@ class ContentBasedFiltering(object):
         # zero out diagonal
         # in the diagonal there is the sim between i and i (1)
         # maybe it's better to have a lil matrix here
-        S.setdiag(0)
-        S.eliminate_zeros()
+        # S.setdiag(0)
+        # S.eliminate_zeros()
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
