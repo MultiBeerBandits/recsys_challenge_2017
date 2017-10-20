@@ -16,7 +16,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=100, k_filtering=95, features=2500):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=95, features=500):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -58,31 +58,27 @@ class ContentBasedFiltering(object):
         S_prime = icm_t.dot(icm)
         print("S prime computed")
 
-        # compute common features
-        # icm_t_ones = icm_t
-        # icm_t_ones[icm_t.nonzero()] = 1
-        # icm_ones = icm
-        # icm_ones[icm_ones.nonzero()] = 1
-        # S_num = icm_t_ones.dot(icm_ones)
-        # S_den = S_num.copy()
-        # S_den += shrinkage
-        # S_den = np.reciprocal(S_den)
-        # S_prime = np.multiply(S_prime, S_num)
-        # S_prime = np.multiply(S_prime, S_den)
+        #compute common features
+        icm_t_ones = icm_t
+        icm_t_ones[icm_t.nonzero()] = 1
+        icm_ones = icm
+        icm_ones[icm_ones.nonzero()] = 1
+        print("started dot prof")
+        S_num = icm_t_ones.dot(icm_ones)
+        print("finished dot")
+        S_den = S_num.copy()
+        print("finished copy")
+        S_den += shrinkage
+        S_den = np.reciprocal(S_den)
+        print("finished rec")
+        S_prime = np.multiply(S_prime, S_num)
+        print("fin mult")
+        S_prime = np.multiply(S_prime, S_den)
         print("S_prime applied shrinkage")
         indices = np.argpartition(S_prime, S_prime.shape[1] - k_filtering, axis=1)[:, :-k_filtering] # keep all rows but until k columns
         for i in range(S_prime.shape[0]):
             S_prime[i, indices[i]] = 0
         S_prime = csr_matrix(S_prime)
-        # Top-K filtering.
-        # We only keep the top K similarity weights to avoid considering many
-        # barely-relevant neighbors
-        # for row_i in range(0, S_prime.shape[0]):
-        #     row = S_prime.data[S_prime.indptr[row_i]:S_prime.indptr[row_i + 1]]
-
-        #     sorted_idx = row.argsort()[:-k_filtering]
-        #     row[sorted_idx] = 0
-
         print("S_prime filtered")
         print("Similarity matrix ready, let's normalize it!")
         # zero out diagonal
@@ -92,21 +88,6 @@ class ContentBasedFiltering(object):
         # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
-        # apply shrinkage factor:
-        # Let I_uv be the set of attributes in common of item i and j
-        # Let H be the shrinkage factor
-        #   Multiply element-wise for the matrix of I_uv (ie: the sim matrix)
-        #   Divide element-wise for the matrix of I_uv incremented by H
-        # Obtaining I_uv / I_uv + H
-        # Rationale:
-        # if I_uv is high H has no importante, otherwise has importance
-        # shr_num = S.copy()
-        # shr_num[shr_num.nonzero()] = 1
-        # shr_den = shr_num.copy()
-        # shr_den.data += shrinkage
-        # shr_den.data = 1 / shr_den.data
-        # S = S.multiply(shr_num)
-        # S = csr_matrix(S.multiply(shr_den))
         # get a column vector of the similarities of item i (i is the row)
         s_norm = S.sum(axis=1)
         # normalize s
@@ -122,8 +103,6 @@ class ContentBasedFiltering(object):
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
         # eliminate playlist that are not target, already done, to check
-        #R_hat = R_hat[:, [dataset.get_track_index_from_id(
-        #    x) for x in self.tr_id_list]]
         print("Shape of final matrix: ", R_hat.shape)
         self.R_hat = R_hat
 

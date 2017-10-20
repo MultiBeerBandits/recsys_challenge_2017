@@ -3,6 +3,7 @@ from scipy.sparse import *
 import numpy as np
 import os.path
 import time
+import pandas as pd
 
 
 class Dataset():
@@ -20,7 +21,7 @@ class Dataset():
         # Initialize clusters for duration and playcount
         self.duration_intervals = 10
         self.playcount_intervals = 10
-        self.pop_threshold = 50
+        self.pop_threshold = 20
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}
@@ -99,18 +100,22 @@ class Dataset():
                 # duration
                 duration = row['duration']
                 if duration is not None and duration != '' and float(duration) != -1:
-                    duration = float(duration) - self.min_duration
-                    duration_offset = min(
-                        int(duration / self.duration_int), self.duration_intervals - 1)
+                    # duration = float(duration) - self.min_duration
+                    # duration_offset = min(
+                    #     int(duration / self.duration_int), self.duration_intervals - 1)
+                    duration = float(duration)
+                    duration_offset = np.digitize(duration, self.duration_bins) - 1
                     duration_index = self.track_attr_mapper['duration'] + \
                         duration_offset
                     icm[duration_index, track_index] = self.duration_weight
                 # playcount
                 playcount = row['playcount']
                 if playcount is not None and playcount != '' and float(playcount) != -1:
-                    playcount = float(playcount) - self.min_playcount
-                    playcount_offset = min(
-                        int(playcount / self.playcount_int), self.playcount_intervals - 1)
+                    # playcount = float(playcount) - self.min_playcount
+                    # playcount_offset = min(
+                    #     int(playcount / self.playcount_int), self.playcount_intervals - 1)
+                    playcount = float(playcount)
+                    playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
                     playcount_index = self.track_attr_mapper['playcount'] + \
                         playcount_offset
                     icm[playcount_index, track_index] = self.playcount_weight
@@ -215,7 +220,8 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     max_playcount = 0
     min_duration = 224000
     max_duration = 224000
-    pop_threshold = 1000
+    durations = [] # array of duration for dividing it in bins
+    playcounts = [] # the same as before
     with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file, delimiter='\t')
         for row in reader:
@@ -237,14 +243,16 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
             if row['duration'] is not None and row['duration'] != '':
                 duration = float(row['duration'])
                 # threshold for max and cleaning
-                if duration != -1 and duration / 1000 < 700:
+                if duration != -1: # and duration / 1000 < 700:
                     if duration < min_duration:
                         min_duration = duration
                     if duration > max_duration:
                         max_duration = duration
+                    durations.append(duration)
             if row['playcount'] is not None and row['playcount'] != '':
                 playcount = float(row['playcount'])
                 # threshold for max
+                playcounts.append(playcount)
                 if playcount < 5000:
                     if playcount < min_playcount:
                         min_playcount = playcount
@@ -283,6 +291,12 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     # set min duration and min playcount
     dataset.min_duration = min_duration
     dataset.min_playcount = min_playcount
+    # for dividing in equal ranges
+    _, duration_bins = pd.qcut(durations, dataset.duration_intervals, retbins=True)
+    _, playcount_bins = pd.qcut(playcounts, dataset.playcount_intervals, retbins=True)
+    print(playcount_bins)
+    dataset.duration_bins = duration_bins
+    dataset.playcount_bins = playcount_bins
     # set index of duration and playcount
     mapper['duration'] = attr_index
     mapper['playcount'] = attr_index + dataset.duration_intervals
