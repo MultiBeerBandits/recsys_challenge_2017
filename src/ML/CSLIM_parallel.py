@@ -8,16 +8,11 @@ import os
 from src.utils.loader import *
 from src.utils.evaluator import *
 
-# PARALLEL STUFF
-# Loading shared array to be used in results
-shared_array_base = 0
-shared_array = 0
-
 
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=0.000001, l2_reg=0.0000001, feature_reg=0.5):
+    def __init__(self, l1_reg=0.0001, l2_reg=0.00001, feature_reg=2):
         self.alpha = l1_reg + l2_reg
         self.l1_ratio = l1_reg / self.alpha
         # this is the weight of |F-FW|, importance of the icm
@@ -33,19 +28,47 @@ class SLIM():
         self.tr_id_list = list(target_items)
 
         # get icm
-        icm = dataset.build_icm() * np.sqrt(feature_reg)
+        icm = dataset.build_icm() * np.sqrt(self.feature_reg)
         M = vstack([urm, icm]).tocsc()
 
-        # LET's PARALLEL!!!
-        total_columns = M.shape[1]
-        ranges = _generate_slices(total_columns)
-        separated_tasks = []
+        model = ElasticNet(alpha=self.alpha,
+                           fit_intercept=False,
+                           l1_ratio=self.l1_ratio,
+                           positive=True)
 
-        for from_j, to_j in ranges:
-            separated_tasks.append([from_j, to_j, Mline, model])
+        # LET's PARALLEL!!!
+        # First we get a sorted list of target items column indices.
+        #   We want them sorted to improve data locality.
+        target_indeces = sorted([dataset.get_track_index_from_id(x)
+                                 for x in target_items])
+
+        # Then we split the target items indices into chunks to ship
+        # to pool workers.
+        chunks = []
+        chunksize = len(target_indeces) // multiprocessing.cpu_count()
+        for i in range(0, len(target_indeces), chunksize):
+            chunks.append(target_indeces[i:i + chunksize])
+
+        # Build a list of parameters to ship to pool workers, containing:
+        #   - A chunk of the target items indices
+        #   - The URM
+        #   - The ElasticNet model
+        separated_tasks = []
+        for ti in chunks:
+            separated_tasks.append([ti, M, model])
 
         pool = multiprocessing.Pool()
-        pool.map(_work, separated_tasks)
+        result = pool.map(_work, separated_tasks)
+
+        # Merge results from workers and close the pool
+        self.W = None
+        for chunk in result:
+            if self.W is None:
+                self.W = chunk
+            else:
+                self.W = lil_matrix(self.W)
+                self.W = self.W + chunk
+
         pool.close()
         pool.join()
 
@@ -53,7 +76,8 @@ class SLIM():
         urm = urm[[dataset.get_playlist_index_from_id(x)
                    for x in self.pl_id_list]]
 
-        self.W = csr_matrix(shared_array)
+        self.W = csr_matrix(self.W)
+        print(urm.shape, self.W.shape)
         # Compute prediction matrix (n_target_users X n_items)
         self.R_hat = urm.dot(self.W).tocsr()
         print('R_hat evaluated...')
@@ -85,55 +109,32 @@ class SLIM():
         return recs
 
 
-def _generate_slices(total_columns):
-    """
-    Generate slices that will be processed based on the number of cores
-    available on the machine.
-    """
-    from multiprocessing import cpu_count
-
-    cores = cpu_count()
-
-    segment_length = total_columns / cores
-
-    ranges = []
-    now = 0
-
-    while now < total_columns:
-        end = now + segment_length
-
-        # The last part can be a little greater that others in some cases
-        # but we can't generate more than #cores ranges
-        end = end if end + segment_length <= total_columns else total_columns
-        ranges.append((now, end))
-        now = end
-
-    return ranges
-
-
-def _work(params, W=shared_array):
+def _work(params):
     # get params
-    from_col = params[0]
-    to_col = params[1]
+    target_indeces = params[0]
+    M = csc_matrix(params[1])
     model = params[2]
-    M = params[3]
     count = 0
     pid = os.getpid()
-    for t in range(from_col, to_col, 1):
+
+    W = lil_matrix((M.shape[1], M.shape[1]))
+    for t in target_indeces:
         if count % 100 == 0:
-            print('[', pid, ']', count / float(to_col - from_col) * 100,
-                  'ElasticNet trained...')
+            print('[', pid, ']', count, '/',
+                  len(target_indeces), 'ElasticNet trained...')
         # Zero-out the t-th column to meet the w_tt = 0 constraint
-        mlinej = M[:, t].copy()
-        M[:, t] = 0
-        M.eliminate_zeros()
+        M_z = M.copy()
+        M_z.data[M_z.indptr[t]:M_z.indptr[t + 1]] = 0
+        M_z.eliminate_zeros()
         r_t = M.getcol(t).toarray().ravel()
 
         # Fit
         model.fit(M_z, r_t)
-        # print(model.coef_.shape)
-        W[:, t] = model.coef_.transpose()
+
+        # Build a W matrix with column indeces from 0 to to_col - from_col
+        W[:, t] = model.sparse_coef_.transpose()
         count += 1
+    return W
 
 
 if __name__ == '__main__':
@@ -143,9 +144,6 @@ if __name__ == '__main__':
     ubf = SLIM()
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        shared_array_base = multiprocessing.Array(ctypes.c_double, urm.shape[1]**2)
-        shared_array = np.ctypeslib.as_array(shared_array_base.get_obj())
-        shared_array = shared_array.reshape(urm.shape[1], urm.shape[1])
         ubf.fit(urm, list(tg_tracks), list(tg_playlist), ds)
         recs = ubf.predict()
         ev.evaluate_fold(recs)
