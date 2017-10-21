@@ -12,7 +12,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=0.0001, l2_reg=0.00001, feature_reg=2):
+    def __init__(self, l1_reg=0.00000001, l2_reg=0.000000001, feature_reg=0.1):
         self.alpha = l1_reg + l2_reg
         self.l1_ratio = l1_reg / self.alpha
         # this is the weight of |F-FW|, importance of the icm
