@@ -19,8 +19,8 @@ class Dataset():
         # initialization of user rating matrix
         self.urm = None
         # Initialize clusters for duration and playcount
-        self.duration_intervals = 10
-        self.playcount_intervals = 10
+        self.duration_intervals = 20
+        self.playcount_intervals = 20
         self.pop_threshold = 20
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
@@ -294,7 +294,6 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     # for dividing in equal ranges
     _, duration_bins = pd.qcut(durations, dataset.duration_intervals, retbins=True)
     _, playcount_bins = pd.qcut(playcounts, dataset.playcount_intervals, retbins=True)
-    print(playcount_bins)
     dataset.duration_bins = duration_bins
     dataset.playcount_bins = playcount_bins
     # set index of duration and playcount

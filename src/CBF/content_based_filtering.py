@@ -2,6 +2,7 @@ from src.utils.loader import *
 from scipy.sparse import *
 import numpy as np
 import numpy.linalg as la
+import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 
 
@@ -43,7 +44,7 @@ class ContentBasedFiltering(object):
         # first calculate norm
         # sum over rows (obtaining a row vector)
         print("Calculating norm")
-        norm = la.norm(icm.todense(), axis=0)
+        norm = sLA.norm(icm, axis=0)
         print("Calculated norm")
         norm[(norm == 0)] = 1
         # normalize

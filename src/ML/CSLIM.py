@@ -9,9 +9,11 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=0.0000001, l2_reg=0.00000001):
+    def __init__(self, l1_reg=0.000001, l2_reg=0.0000001, feature_reg=0.8):
         self.alpha = l1_reg + l2_reg
         self.l1_ratio = l1_reg / self.alpha
+        # this is the weight of |F-FW|, importance of the icm
+        self.feature_reg = feature_reg
         self.W = None
         self.R_hat = None
         self.pl_id_list = None
@@ -24,9 +26,9 @@ class SLIM():
         # Initialize W matrix
         self.W = lil_matrix((urm.shape[1], urm.shape[1]))
 
-        # We access URM by columns
-        urm = urm.tocsc()
-
+        # get icm
+        icm = dataset.build_icm()
+        M = vstack([urm, icm]).tocsc()
         # For each target item train an ElasticNet model
         count = 0
         for t in [dataset.get_track_index_from_id(x)
@@ -34,19 +36,19 @@ class SLIM():
             if count % 100 == 0:
                 print(count, '/', len(target_items), 'ElasticNet trained...')
             # Zero-out the t-th column to meet the w_tt = 0 constraint
-            urm_z = urm.copy()
-            urm_z.data[urm_z.indptr[t]:urm_z.indptr[t + 1]] = 0
-            urm_z.eliminate_zeros()
+            M_z = M.copy()
+            M_z.data[M_z.indptr[t]:M_z.indptr[t + 1]] = 0
+            M_z.eliminate_zeros()
 
             # Prepare data for model fit
             model = ElasticNet(alpha=self.alpha,
                                fit_intercept=False,
                                l1_ratio=self.l1_ratio,
                                positive=True)
-            r_t = urm.getcol(t).toarray().ravel()
+            r_t = M.getcol(t).toarray().ravel()
 
             # Fit
-            model.fit(urm_z, r_t)
+            model.fit(M_z, r_t)
             # print(model.coef_.shape)
             self.W[:, t] = model.sparse_coef_.transpose()
             count += 1
