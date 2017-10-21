@@ -9,7 +9,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=0.001, l2_reg=0.0001):
+    def __init__(self, l1_reg=0.00001, l2_reg=0.000001):
         self.alpha = l1_reg + l2_reg
         self.l1_ratio = l1_reg / self.alpha
         self.W = None
@@ -28,30 +28,31 @@ class SLIM():
         urm = urm.tocsc()
 
         # For each target item train an ElasticNet model
+        count = 0
         for t in [dataset.get_track_index_from_id(x)
                   for x in target_items]:
+            if count % 100 == 0:
+                print(count, '/', len(target_items), 'ElasticNet trained...')
             # Zero-out the t-th column to meet the w_tt = 0 constraint
             urm_z = urm.copy()
             urm_z.data[urm_z.indptr[t]:urm_z.indptr[t + 1]] = 0
             urm_z.eliminate_zeros()
 
             # Prepare data for model fit
-            model = SGDRegressor(penalty='elasticnet',
-                                 alpha=self.alpha,
-                                 fit_intercept=False,
-                                 l1_ratio=self.l1_ratio,
-                                 max_iter=1000,
-                                 tol=1e-3)
-            print(repr(urm.getcol(t)))
+            model = ElasticNet(alpha=self.alpha,
+                               fit_intercept=False,
+                               l1_ratio=self.l1_ratio,
+                               positive=True)
             r_t = urm.getcol(t).toarray().ravel()
 
             # Fit
             model.fit(urm_z, r_t)
-            print(model.coef_.shape)
-            self.W[:, t] = csr_matrix(model.coef_).transpose()
-            print('ElasticNet model for item', t, 'fit...')
-            print(repr(self.W[:, t]))
-            print(self.W[:, t][self.W[:, t].nonzero()][:10])
+            # print(model.coef_.shape)
+            self.W[:, t] = model.sparse_coef_.transpose()
+            count += 1
+            # print('ElasticNet model for item', t, 'fit...')
+            # print(repr(self.W[:, t]))
+            # print(self.W[:, t][self.W[:, t].nonzero()][:10])
 
         # clean urm from unwanted users
         urm = urm[[dataset.get_playlist_index_from_id(x)
