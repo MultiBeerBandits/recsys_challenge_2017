@@ -1,5 +1,4 @@
 import multiprocessing
-import ctypes
 from scipy.sparse import *
 from sklearn.linear_model import ElasticNet, SGDRegressor
 import numpy as np
@@ -12,7 +11,19 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=0.00001, l2_reg=0.000001, feature_reg=0.5):
+    def __init__(self, l1_reg=0.00000001, l2_reg=0.000000001, feature_reg=0.1):
+        """
+        On 2017-10-22 we scored 0.081887527481395 with
+            l1_reg=0.00001,
+            l2_reg=0.000001,
+            feature_reg=0.5
+        ICM weights:
+            art_w=1,
+            alb_w=1,
+            dur_w=0.2,
+            playcount_w=0.2,
+            tags_w=0.2
+        """
         self.alpha = l1_reg + l2_reg
         self.l1_ratio = l1_reg / self.alpha
         # this is the weight of |F-FW|, importance of the icm
