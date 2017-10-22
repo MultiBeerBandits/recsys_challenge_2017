@@ -12,7 +12,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=0.0001, l2_reg=0.00001, feature_reg=2):
+    def __init__(self, l1_reg=0.00001, l2_reg=0.000001, feature_reg=0.5):
         self.alpha = l1_reg + l2_reg
         self.l1_ratio = l1_reg / self.alpha
         # this is the weight of |F-FW|, importance of the icm
@@ -26,6 +26,13 @@ class SLIM():
         # Store target playlists and tracks
         self.pl_id_list = list(target_users)
         self.tr_id_list = list(target_items)
+
+        # Set ICM weights
+        dataset.set_track_attr_weights(art_w=1,
+                                       alb_w=1,
+                                       dur_w=0.2,
+                                       playcount_w=0.2,
+                                       tags_w=0.2)
 
         # get icm
         icm = dataset.build_icm() * np.sqrt(self.feature_reg)
