@@ -3,6 +3,7 @@ from scipy.sparse import *
 from sklearn.linear_model import ElasticNet, SGDRegressor
 import numpy as np
 import os
+import time
 
 from src.utils.loader import *
 from src.utils.evaluator import *
@@ -11,7 +12,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=0.00000001, l2_reg=0.000000001, feature_reg=0.1):
+    def __init__(self, l1_reg=2e-5, l2_reg=2e-6, feature_reg=2.2):
         """
         On 2017-10-22 we scored 0.081887527481395 with
             l1_reg=0.00001,
@@ -43,7 +44,7 @@ class SLIM():
                                        alb_w=1,
                                        dur_w=0.2,
                                        playcount_w=0.2,
-                                       tags_w=0.2)
+                                       tags_w=0.1)
 
         # get icm
         icm = dataset.build_icm() * np.sqrt(self.feature_reg)
@@ -75,6 +76,8 @@ class SLIM():
         for ti in chunks:
             separated_tasks.append([ti, M, model])
 
+        start = time.time()
+
         pool = multiprocessing.Pool()
         result = pool.map(_work, separated_tasks)
 
@@ -89,6 +92,10 @@ class SLIM():
 
         pool.close()
         pool.join()
+
+        end = time.time()
+
+        print("Time elapsed: ", (end - start) / 60)
 
         # clean urm from unwanted users
         urm = urm[[dataset.get_playlist_index_from_id(x)
@@ -141,13 +148,12 @@ def _work(params):
             print('[', pid, ']', count, '/',
                   len(target_indeces), 'ElasticNet trained...')
         # Zero-out the t-th column to meet the w_tt = 0 constraint
-        M_z = M.copy()
-        M_z.data[M_z.indptr[t]:M_z.indptr[t + 1]] = 0
-        M_z.eliminate_zeros()
         r_t = M.getcol(t).toarray().ravel()
-
+        M.data[M.indptr[t]:M.indptr[t + 1]] = 0
         # Fit
-        model.fit(M_z, r_t)
+        model.fit(M, r_t)
+        # restore matrix
+        M[:, t] = csc_matrix(r_t).transpose()
 
         # Build a W matrix with column indeces from 0 to to_col - from_col
         W[:, t] = model.sparse_coef_.transpose()
@@ -156,7 +162,7 @@ def _work(params):
 
 
 if __name__ == '__main__':
-    ds = Dataset()
+    ds = Dataset(load_tags=True, filter_tag=True)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     ubf = SLIM()
