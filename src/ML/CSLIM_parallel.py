@@ -12,7 +12,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=2e-5, l2_reg=2e-6, feature_reg=2.2):
+    def __init__(self, l1_reg=1e-5, l2_reg=1e-6, feature_reg=1.7):
         """
         On 2017-10-22 we scored 0.081887527481395 with
             l1_reg=0.00001,
@@ -44,7 +44,7 @@ class SLIM():
                                        alb_w=1,
                                        dur_w=0.2,
                                        playcount_w=0.2,
-                                       tags_w=0.1)
+                                       tags_w=0.2)
 
         # get icm
         icm = dataset.build_icm() * np.sqrt(self.feature_reg)
