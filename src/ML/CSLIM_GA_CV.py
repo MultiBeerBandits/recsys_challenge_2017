@@ -12,6 +12,15 @@ from deap import base
 from deap import creator
 from deap import tools
 
+# Logging stuff
+import logging
+
+# write log to file, filemode = 'w' tells to write each time a new file
+logging.basicConfig(filename='cslim.log',
+                    format='%(asctime)s %(message)s',
+                    filemode='w',
+                    level=logging.DEBUG)
+
 
 def main():
     ######################
@@ -49,20 +58,22 @@ def main():
     # create an initial population
     pop = toolbox.population(n=20)
 
+    logging.info(" Created %i individuals" % len(pop))
+
     # CXPB  is the probability with which two individuals
     #       are crossed
     #
     # MUTPB is the probability for mutating an individual
     CXPB, MUTPB = 0.5, 0.2
 
-    print("Start of evolution")
+    logging.info("Start of evolution")
 
     # Evaluate the entire population
     fitnesses = list(map(toolbox.evaluate, pop))
     for ind, fit in zip(pop, fitnesses):
         ind.fitness.values = fit
 
-    print("  Evaluated %i individuals" % len(pop))
+    logging.info("  Evaluated %i individuals" % len(pop))
 
     # Extracting all the fitnesses of
     fits = [ind.fitness.values[0] for ind in pop]
@@ -75,7 +86,7 @@ def main():
     while g < 1000:
         # A new generation
         g = g + 1
-        print("-- Generation %i --" % g)
+        logging.info("-- Generation %i --" % g)
 
         # Select the next generation individuals
         offspring = toolbox.select(pop, len(pop))
@@ -107,7 +118,7 @@ def main():
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
 
-        print("  Evaluated %i individuals" % len(invalid_ind))
+        logging.info("  Evaluated %i individuals" % len(invalid_ind))
 
         # The population is entirely replaced by the offspring
         pop[:] = offspring
@@ -120,18 +131,18 @@ def main():
         sum2 = sum(x * x for x in fits)
         std = abs(sum2 / length - mean ** 2) ** 0.5
 
-        print("  Min %s" % min(fits))
-        print("  Max %s" % max(fits))
-        print("  Avg %s" % mean)
-        print("  Std %s" % std)
+        logging.info("  Min %s" % min(fits))
+        logging.info("  Max %s" % max(fits))
+        logging.info("  Avg %s" % mean)
+        logging.info("  Std %s" % std)
 
         best_ind = tools.selBest(pop, 1)[0]
-        print("Best individual so far is %s, %s" % (best_ind, best_ind.fitness.values))
+        logging.info("Best individual so far is %s, %s" % (best_ind, best_ind.fitness.values))
 
-    print("-- End of evolution --")
+    logging.info("-- End of evolution --")
 
     best_ind = tools.selBest(pop, 1)[0]
-    print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
+    logging.info("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
     alfa = best_ind[0]
     l1_reg = best_ind[1]
     l2_reg = best_ind[2]
@@ -164,7 +175,7 @@ def evalOneMax(individual):
     alfa = individual[0]
     l1_reg = individual[1]
     l2_reg = individual[2]
-    print("Trying ", alfa, l1_reg, l2_reg)
+    logging.info("Trying " + str(alfa) + ' ' + str(l1_reg) + ' ' + str(l2_reg))
     # create all and evaluate
     ds = Dataset()
     ev = Evaluator()
