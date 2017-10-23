@@ -163,6 +163,7 @@ def main():
     l1_reg = best_ind[1]
     l2_reg = best_ind[2]
     # export csv
+    ds = Dataset()
     cslim = SLIM(l1_reg, l2_reg, alfa)
     urm = ds.build_train_matrix()
     tg_playlist = list(ds.target_playlists.keys())
@@ -196,14 +197,14 @@ def evalOneMax(individual):
     ds = Dataset()
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
-    for i in range(0, 1):
+    for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         cslim = SLIM(l1_reg, l2_reg, alfa)
         cslim.fit(urm, tg_tracks, tg_playlist, ds)
         recs = cslim.predict()
-        map = ev.evaluate_fold(recs)
-    # map_at_five = ev.get_mean_map()
-    return [map]
+        ev.evaluate_fold(recs)
+    map_at_five = ev.get_mean_map()
+    return [map_at_five]
 
 
 if __name__ == '__main__':
