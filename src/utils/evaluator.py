@@ -110,6 +110,7 @@ class Evaluator(object):
                 len(self.test_dictionaries[self.current_fold_index].keys())
             print("MAP@5: " + str(map_at_five))
             self.evaluations[self.current_fold_index] = map_at_five
+            return map_at_five
 
     def get_mean_map(self):
         """

@@ -34,9 +34,9 @@ def main():
     # alfa drawn with uniform probability between 0.1 and 3
     toolbox.register("alfa", random.uniform, 0.1, 3)
     # L1 reg with uniform prob between 1e-8 and 1e-2
-    toolbox.register("l1_reg", random.uniform, 1e-8, 1e-2)
+    toolbox.register("l1_reg", random.uniform, 1e-6, 1e-3)
     # L2 is the same as L1 but smaller
-    toolbox.register("l2_reg", random.uniform, 1e-9, 1e-3)
+    toolbox.register("l2_reg", random.uniform, 1e-7, 1e-4)
     # Structure initializers
     toolbox.register("individual", tools.initCycle, creator.Individual,
                      (toolbox.alfa, toolbox.l1_reg, toolbox.l2_reg), n=1)
@@ -46,10 +46,17 @@ def main():
     toolbox.register("evaluate", evalOneMax)
 
     # register the crossover operator
-    toolbox.register("mate", tools.cxTwoPoint)
+    toolbox.register("mate", tools.cxBlend, alpha=0.5)
 
     # register a mutation operator
-    toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
+    # sigma is the std deviation of the mutation operator
+    sigma_reg = 1e-6
+    sigma_alpha = 0.3
+    alpha_default = 2
+    l1_default = 1e-5
+    l2_default = 1e-6
+    param_defaults = [alpha_default, l1_default, l2_default]
+    toolbox.register("mutate", tools.mutGaussian, mu=[0, 0, 0], sigma=[sigma_alpha, sigma_reg, sigma_reg], indpb=0.1)
 
     # operator for selecting individuals for breeding the next
     # generation
@@ -64,7 +71,7 @@ def main():
     #       are crossed
     #
     # MUTPB is the probability for mutating an individual
-    CXPB, MUTPB = 0.5, 0.2
+    CXPB, MUTPB = 0.7, 0.3
 
     logging.info("Start of evolution")
 
@@ -99,7 +106,12 @@ def main():
             # cross two individuals with probability CXPB
             if random.random() < CXPB:
                 toolbox.mate(child1, child2)
-
+                # check validity of the children
+                for i in range(0, 3):
+                    if child1[i] <= 0:
+                        child1[i] = param_defaults[i]
+                    if child2[i] <= 0:
+                        child2[i] = param_defaults[i]
                 # fitness values of the children
                 # must be recalculated later
                 del child1.fitness.values
@@ -110,6 +122,10 @@ def main():
             # mutate an individual with probability MUTPB
             if random.random() < MUTPB:
                 toolbox.mutate(mutant)
+                # check validity of the mutant
+                for i in range(0, 3):
+                    if mutant[i] <= 0:
+                        mutant[i] = param_defaults[i]
                 del mutant.fitness.values
 
         # Evaluate the individuals with an invalid fitness
@@ -180,14 +196,14 @@ def evalOneMax(individual):
     ds = Dataset()
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
-    for i in range(0, 5):
+    for i in range(0, 1):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         cslim = SLIM(l1_reg, l2_reg, alfa)
         cslim.fit(urm, tg_tracks, tg_playlist, ds)
         recs = cslim.predict()
-        ev.evaluate_fold(recs)
-    map_at_five = ev.get_mean_map()
-    return [map_at_five]
+        map = ev.evaluate_fold(recs)
+    # map_at_five = ev.get_mean_map()
+    return [map]
 
 
 if __name__ == '__main__':

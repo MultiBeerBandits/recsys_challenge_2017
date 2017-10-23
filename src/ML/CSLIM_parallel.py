@@ -4,7 +4,8 @@ from sklearn.linear_model import ElasticNet, SGDRegressor
 import numpy as np
 import os
 import time
-
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.preprocessing import normalize
 from src.utils.loader import *
 from src.utils.evaluator import *
 
@@ -12,7 +13,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=1e-5, l2_reg=1e-6, feature_reg=1.7):
+    def __init__(self, l1_reg=1e-5, l2_reg=1e-6, feature_reg=2):
         """
         On 2017-10-22 we scored 0.081887527481395 with
             l1_reg=0.00001,
@@ -48,6 +49,11 @@ class SLIM():
 
         # get icm
         icm = dataset.build_icm() * np.sqrt(self.feature_reg)
+        # Apply tf idf
+        # transformer = TfidfTransformer()
+        # icm = transformer.fit_transform(icm.transpose()).transpose()
+        # icm = normalize(icm, axis=0)
+        # Build training matrix
         M = vstack([urm, icm]).tocsc()
 
         model = ElasticNet(alpha=self.alpha,
@@ -166,10 +172,28 @@ if __name__ == '__main__':
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     ubf = SLIM()
-    for i in range(0, 5):
-        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        ubf.fit(urm, list(tg_tracks), list(tg_playlist), ds)
-        recs = ubf.predict()
-        ev.evaluate_fold(recs)
-    map_at_five = ev.get_mean_map()
-    print("MAP@5", map_at_five)
+    urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+    ubf.fit(urm, list(tg_tracks), list(tg_playlist), ds)
+    recs = ubf.predict()
+    ev.evaluate_fold(recs)
+
+    # export
+    cslim = SLIM()
+    urm = ds.build_train_matrix()
+    tg_playlist = list(ds.target_playlists.keys())
+    tg_tracks = list(ds.target_tracks.keys())
+    # Train the model with the best shrinkage found in cross-validation
+    cslim.fit(urm,
+              tg_tracks,
+              tg_playlist, ds)
+    recs = cslim.predict()
+    with open('submission_cslim.csv', mode='w', newline='') as out:
+        fieldnames = ['playlist_id', 'track_ids']
+        writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
+        writer.writeheader()
+        for k in tg_playlist:
+            track_ids = ''
+            for r in recs[k]:
+                track_ids = track_ids + r + ' '
+            writer.writerow({'playlist_id': k,
+                             'track_ids': track_ids[:-1]})
