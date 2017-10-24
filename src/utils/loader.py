@@ -4,6 +4,8 @@ import numpy as np
 import os.path
 import time
 import pandas as pd
+# Cluster stuff
+from sklearn.cluster import KMeans
 
 
 class Dataset():
@@ -19,9 +21,10 @@ class Dataset():
         # initialization of user rating matrix
         self.urm = None
         # Initialize clusters for duration and playcount
+        # selected by studying the error of k-means
         self.duration_intervals = 20
         self.playcount_intervals = 20
-        self.pop_threshold = 20
+        self.pop_threshold = 5
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}
@@ -29,7 +32,7 @@ class Dataset():
         # format: {column index: 'track_id'}
         # track_attr_mapper maps attributes to row index
         # format: {'artist_id': {'artist_key': row_index}}
-        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number = build_tracks_mappers(
+        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number = build_tracks_mappers_clusters(
             self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
         # build playlist mappers
         # playlist_id_mapper maps playlist id to columns of ucm
@@ -75,6 +78,8 @@ class Dataset():
         AxI (A is the number of attributes and I is the number of items)
         """
         icm = lil_matrix((self.attrs_number, self.tracks_number))
+        duration_index = 0
+        playcount_index = 0
         with open(path, newline='') as csv_file:
             reader = csv.DictReader(csv_file, delimiter='\t')
             for row in reader:
@@ -104,10 +109,14 @@ class Dataset():
                     # duration_offset = min(
                     #     int(duration / self.duration_int), self.duration_intervals - 1)
                     duration = float(duration)
-                    duration_offset = np.digitize(duration, self.duration_bins) - 1
+                    # duration_offset = np.digitize(duration, self.duration_bins) - 1
+                    # get the cluster
+                    duration_offset = self.duration_cluster[duration_index]
                     duration_index = self.track_attr_mapper['duration'] + \
                         duration_offset
                     icm[duration_index, track_index] = self.duration_weight
+                    # go ahead with duration index
+                    duration_index+=1
                 # playcount
                 playcount = row['playcount']
                 if playcount is not None and playcount != '' and float(playcount) != -1:
@@ -115,10 +124,13 @@ class Dataset():
                     # playcount_offset = min(
                     #     int(playcount / self.playcount_int), self.playcount_intervals - 1)
                     playcount = float(playcount)
-                    playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
+                    # playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
+                    # get the cluster
+                    playcount_offset = self.playcount_cluster[playcount_index]
                     playcount_index = self.track_attr_mapper['playcount'] + \
                         playcount_offset
                     icm[playcount_index, track_index] = self.playcount_weight
+                    playcount_index+=1
         return icm
 
     def build_train_matrix(self, filename='csr_urm.npz'):
@@ -296,6 +308,91 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     _, playcount_bins = pd.qcut(playcounts, dataset.playcount_intervals, retbins=True)
     dataset.duration_bins = duration_bins
     dataset.playcount_bins = playcount_bins
+    # set index of duration and playcount
+    mapper['duration'] = attr_index
+    mapper['playcount'] = attr_index + dataset.duration_intervals
+
+    attr_index += dataset.duration_intervals + dataset.playcount_intervals + 1
+
+    return track_id_mapper, track_index_mapper, mapper, attr_index
+
+def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=False):
+    """
+    Build the mappers of tracks
+    """
+    # attrs is a dict that contains for every attribute its different values
+    # used for mappers
+    attrs = {'artist_id': set(), 'album': set(), 'tags': set()}
+    # used for couting frequency of each tag. key is the tag, value is the frequency
+    tag_counter = {}
+    # mapper from track id to column index. key is track id value is column
+    track_id_mapper = {}
+    # mapper from index to track id. key is column, value is id
+    track_index_mapper = {}
+    # this is the number of columns of the matrix of the matrix
+    track_index = 0
+    # duration and playcount attributes
+    min_playcount = 10
+    max_playcount = 0
+    min_duration = 224000
+    max_duration = 224000
+    durations = [] # array of duration for dividing it in bins
+    playcounts = [] # the same as before
+    with open(path, newline='') as csv_file:
+        reader = csv.DictReader(csv_file, delimiter='\t')
+        for row in reader:
+            attrs['artist_id'].add(row['artist_id'])
+            albums = parse_csv_array(row['album'])
+            for album in albums:
+                attrs['album'].add(album)
+            tags = parse_csv_array(row['tags'])
+            for tag in tags:
+                attrs['tags'].add(tag)
+                if tag in tag_counter:
+                    tag_counter[tag] += 1
+                else:
+                    tag_counter[tag] = 1
+            track_id_mapper[row['track_id']] = track_index
+            track_index_mapper[track_index] = row['track_id']
+            # duration
+            # duration is -1 if not present
+            if row['duration'] is not None and row['duration'] != '':
+                duration = float(row['duration'])
+                # threshold for max and cleaning
+                if duration != -1: # and duration / 1000 < 700:
+                    durations.append(duration)
+            if row['playcount'] is not None and row['playcount'] != '':
+                playcount = float(row['playcount'])
+                # threshold for max
+                playcounts.append(playcount)
+            track_index += 1
+    # set tag counter
+    dataset.tag_counter = tag_counter
+    # is a dictionary of dictionary
+    # for each attrbute a dictionary of keys of attribute and their index
+    mapper = {'artist_id': {}, 'album': {},
+              'tags': {}, 'duration': 0, 'playcount': 0}
+    attr_index = 0
+    for v in attrs['artist_id']:
+        mapper['artist_id'][v] = attr_index
+        attr_index += 1
+    for v in attrs['album']:
+        mapper['album'][v] = attr_index
+        attr_index += 1
+    # load tags only if specified and only if higher than pop threshold
+    if load_tags:
+        for v in attrs['tags']:
+            if filter_tag:
+                if tag_counter[v] > dataset.pop_threshold:
+                    mapper['tags'][v] = attr_index
+                    attr_index += 1
+            else:
+                mapper['tags'][v] = attr_index
+                attr_index += 1
+
+    #  Divide duration and playcount in cluster
+    dataset.duration_cluster = KMeans(n_clusters=dataset.duration_intervals).fit_predict(np.reshape(durations,(-1,1)))
+    dataset.playcount_cluster = KMeans(n_clusters=dataset.playcount_intervals).fit_predict(np.reshape(playcounts,(-1,1)))
     # set index of duration and playcount
     mapper['duration'] = attr_index
     mapper['playcount'] = attr_index + dataset.duration_intervals
