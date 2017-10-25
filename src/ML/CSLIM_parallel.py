@@ -48,7 +48,8 @@ class SLIM():
                                        tags_w=0.2)
 
         # get icm
-        icm = dataset.build_icm() * np.sqrt(self.feature_reg)
+        icm = dataset.add_playlist_to_icm(
+            dataset.build_icm(), 0.5) * np.sqrt(self.feature_reg)
         # Apply tf idf
         # transformer = TfidfTransformer()
         # icm = transformer.fit_transform(icm.transpose()).transpose()
@@ -171,12 +172,14 @@ if __name__ == '__main__':
     ds = Dataset(load_tags=True, filter_tag=True)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
-    ubf = SLIM()
-    urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-    ubf.fit(urm, list(tg_tracks), list(tg_playlist), ds)
-    recs = ubf.predict()
-    ev.evaluate_fold(recs)
-
+    for i in range(0, 5):
+        ubf = SLIM()
+        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+        ubf.fit(urm, list(tg_tracks), list(tg_playlist), ds)
+        recs = ubf.predict()
+        ev.evaluate_fold(recs)
+    map_at_five = ev.get_mean_map()
+    print("MAP@5 Final", map_at_five)
     # export
     cslim = SLIM()
     urm = ds.build_train_matrix()

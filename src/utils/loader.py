@@ -186,6 +186,12 @@ class Dataset():
                 M[i - start] = 1
         return M
 
+    def add_playlist_to_icm(self, icm, urm_weight):
+        # for each track add the playlist attribute
+        urm_weighted = self.urm * urm_weight
+        return vstack([icm, urm_weighted])
+
+
 
 def load_train_final(path):
     res = {}
@@ -315,6 +321,7 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     attr_index += dataset.duration_intervals + dataset.playcount_intervals + 1
 
     return track_id_mapper, track_index_mapper, mapper, attr_index
+
 
 def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=False):
     """
