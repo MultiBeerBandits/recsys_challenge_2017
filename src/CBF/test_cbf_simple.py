@@ -7,13 +7,13 @@ from itertools import product
 
 
 def main():
-    best_map = 0
-    best_album_w = 0
-    best_artist_w = 0
-    shr_w = 100
-    k_f = 50
-    ds = Dataset(load_tags=True, filter_tag=False)
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.1)
+    # best_map = 0
+    # best_album_w = 0
+    # best_artist_w = 0
+    # shr_w = 100
+    # k_f = 50
+    ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
@@ -25,10 +25,7 @@ def main():
         recs = cbf.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
-    print(("MAP@5 [shrinkage: " + str(shr_w) +
-           " k_filtering: " + str(k_f) +
-           " album_w: " + str(alb_w) +
-           " artist_w: " + str(art_w) + "]: "), map_at_five)
+    print("MAP@5 ", map_at_five)
 
     # export csv
     cbf_exporter = ContentBasedFiltering()

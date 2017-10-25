@@ -186,9 +186,9 @@ class Dataset():
                 M[i - start] = 1
         return M
 
-    def add_playlist_to_icm(self, icm, urm_weight):
+    def add_playlist_to_icm(self, icm, urm, urm_weight):
         # for each track add the playlist attribute
-        urm_weighted = self.urm * urm_weight
+        urm_weighted = urm * urm_weight
         return vstack([icm, urm_weighted])
 
 
