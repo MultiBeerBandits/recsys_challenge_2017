@@ -242,7 +242,7 @@ def iterate(urm, Theta, l_pos, l_neg, l_rate, iteration_length, worker_id):
         if n % 1000 == 0 and n != 0:
             print('[ {:d} ] Saving Theta on disk...'.format(os.getpid()))
             save_sparse_matrix('./data/cslim_bpr_theta_{}.npz'
-                               .format(worker_id))
+                               .format(worker_id), Theta)
         # sample from Ds
         u, i, j = draw()
 
