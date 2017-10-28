@@ -20,6 +20,9 @@ class Evaluator(object):
         # evaluation for each fold
         self.evaluations = []
 
+        # a dictionary containing for each playlist its map@5
+        self.map_playlists = {}
+
         self.folds = 0
 
     def cross_validation(self, folds, train_dataset):
@@ -104,13 +107,35 @@ class Evaluator(object):
                         precision = relevant_items / item_number
                         ap = ap + precision
                     item_number += 1
-                # should ap be divided by 5?????
+                # save the map@5 into the dictionary
+                self.map_playlists[pl_id] = ap / 5
                 cumulated_ap = cumulated_ap + (ap / 5)
             map_at_five = cumulated_ap / \
                 len(self.test_dictionaries[self.current_fold_index].keys())
             print("MAP@5: " + str(map_at_five))
             self.evaluations[self.current_fold_index] = map_at_five
             return map_at_five
+
+    def print_worst(self, dataset):
+        """
+        Returns the id of the worst playlists in the current fold
+        (Worst according to MAP@5)
+        """
+        # this should return a list of tuples ordered by map
+        sorted_list = sorted(self.map_playlists.items(), key=lambda x: x[1])
+        # print the first 10 elements
+        for i in range(0, 10):
+            pl_id = sorted_list[i][0]
+            map_5 = sorted_list[i][1]
+            print("Playlist id:", pl_id, map_5)
+            print("Tracks ", dataset.train_final[pl_id])
+            print("Hidden Tracks: ", self.test_dictionaries[self.current_fold_index][pl_id])
+            print("Train tracks:", len(dataset.train_final[pl_id]) - len(self.test_dictionaries[self.current_fold_index][pl_id]))
+            for tr_id in dataset.train_final[pl_id]:
+                if tr_id not in self.test_dictionaries[self.current_fold_index][pl_id]:
+                    print("Features:", dataset.tracks_final[tr_id])
+            print("---------------------------------")
+
 
     def get_mean_map(self):
         """

@@ -32,7 +32,8 @@ class Dataset():
         # format: {column index: 'track_id'}
         # track_attr_mapper maps attributes to row index
         # format: {'artist_id': {'artist_key': row_index}}
-        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number = build_tracks_mappers_clusters(
+        # tag counter maps tags to its frequency normalized
+        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter = build_tracks_mappers_clusters(
             self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
         # build playlist mappers
         # playlist_id_mapper maps playlist id to columns of ucm
@@ -101,7 +102,8 @@ class Dataset():
                     for tag in tags:
                         if tag in self.track_attr_mapper['tags']:
                             tag_index = self.track_attr_mapper['tags'][tag]
-                            icm[tag_index, track_index] = self.tags_weight
+                            tag_weight = self.tag_counter[tag] * self.tags_weight
+                            icm[tag_index, track_index] = tag_weight
                 # duration
                 duration = row['duration']
                 if duration is not None and duration != '' and float(duration) != -1:
@@ -190,7 +192,6 @@ class Dataset():
         # for each track add the playlist attribute
         urm_weighted = urm * urm_weight
         return vstack([icm, urm_weighted])
-
 
 
 def load_train_final(path):
@@ -330,7 +331,7 @@ def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=Fal
     # attrs is a dict that contains for every attribute its different values
     # used for mappers
     attrs = {'artist_id': set(), 'album': set(), 'tags': set()}
-    # used for couting frequency of each tag. key is the tag, value is the frequency
+    # used for couting frequency of each tag. key is tag, value is frequency
     tag_counter = {}
     # mapper from track id to column index. key is track id value is column
     track_id_mapper = {}
@@ -339,12 +340,8 @@ def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=Fal
     # this is the number of columns of the matrix of the matrix
     track_index = 0
     # duration and playcount attributes
-    min_playcount = 10
-    max_playcount = 0
-    min_duration = 224000
-    max_duration = 224000
-    durations = [] # array of duration for dividing it in bins
-    playcounts = [] # the same as before
+    durations = []  # array of duration for dividing it in bins
+    playcounts = []  # the same as before
     with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file, delimiter='\t')
         for row in reader:
@@ -406,7 +403,12 @@ def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=Fal
 
     attr_index += dataset.duration_intervals + dataset.playcount_intervals + 1
 
-    return track_id_mapper, track_index_mapper, mapper, attr_index
+    # normalize tag frequency
+    max_freq = max([x for x in tag_counter.values()])
+    for k in tag_counter:
+        tag_counter[k] = tag_counter[k] / max_freq
+
+    return track_id_mapper, track_index_mapper, mapper, attr_index, tag_counter
 
 
 def build_playlists_mappers(path):
