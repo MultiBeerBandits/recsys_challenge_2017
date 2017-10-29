@@ -2,6 +2,8 @@ from multiprocessing import Pool
 from scipy.sparse import *
 import numpy as np
 import os
+import sys
+from pathlib import Path
 from src.utils.loader import *
 from src.utils.evaluator import *
 import random
@@ -410,7 +412,7 @@ def load_sparse_matrix(filename):
     return m
 
 
-if __name__ == '__main__':
+def full_run():
     ds = Dataset(load_tags=True, filter_tag=True)
     # export
     bprcslim = BPRCSLIM()
@@ -438,3 +440,76 @@ if __name__ == '__main__':
                 track_ids = track_ids + r + ' '
             writer.writerow({'playlist_id': k,
                              'track_ids': track_ids[:-1]})
+
+
+def merge_and_evaluate():
+    # Get dataset info
+    print('Collecting from dataset...')
+    ds = Dataset(load_tags=True, filter_tag=True)
+    urm = ds.build_train_matrix()
+    tg_playlist = list(ds.target_playlists.keys())
+    pl_indices = [ds.get_playlist_index_from_id(x)
+                  for x in tg_playlist]
+    tg_tracks = list(ds.target_tracks.keys())
+    tr_indices = [ds.get_track_index_from_id(x)
+                  for x in tg_tracks]
+
+    # Scan for available cslim_bpr_theta backups
+    print('Averaging available Thetas...')
+    backups = sorted(Path('./data/').glob('cslim_bpr_theta_*.npz'))
+    Theta = csr_matrix((urm.shape[1], urm.shape[1]))
+    # Reduce them by averaging their values
+    for b in backups:
+        T = load_sparse_matrix(str(b)).tocsr()
+        Theta = Theta + T
+    Theta.data /= len(backups)
+
+    # Compute predicted ratings
+    print('Computing R_hat...')
+    R_hat = compute_R_hat(urm, Theta, pl_indices, tr_indices).tocsr()
+
+    urm_test = urm.tolil()
+    urm_test = urm_test[pl_indices].tolil()
+    urm_test = urm_test[:, tr_indices].tocsr()
+
+    # Evaluate the MAP
+    print('Evaluating MAP@5...')
+    MAP = evaluate(urm_test, R_hat, pl_indices, at=5)
+    print('MAP@5 = {:f}'.format(MAP))
+
+    # Build recs (CODE DUPLICATION YEAHHH)
+    print('Building recommendations...')
+    recs = {}
+    for i in range(0, R_hat.shape[0]):
+        pl_id = tg_playlist[i]
+        pl_row = R_hat.data[R_hat.indptr[i]:
+                            R_hat.indptr[i + 1]]
+        # get top 5 indeces. argsort, flip and get first at-1 items
+        sorted_row_idx = np.flip(pl_row.argsort(), axis=0)[0:5]
+        track_cols = [R_hat.indices[R_hat.indptr[i] + x]
+                      for x in sorted_row_idx]
+        tracks_ids = [tg_tracks[x] for x in track_cols]
+        recs[pl_id] = tracks_ids
+
+    # OTHER CODE DUPLICATION!
+    print('Writing submission csv file...')
+    with open('submission_cslim.csv', mode='w', newline='') as out:
+        fieldnames = ['playlist_id', 'track_ids']
+        writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
+        writer.writeheader()
+        for k in tg_playlist:
+            track_ids = ''
+            for r in recs[k]:
+                track_ids = track_ids + r + ' '
+            writer.writerow({'playlist_id': k,
+                             'track_ids': track_ids[:-1]})
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        full_run()
+    elif sys.argv[1] == '--merge':
+        merge_and_evaluate()
+    else:
+        print(('Unknown parameter \'{}\'\n'
+               'Usage: {} [--merge]').format(sys.argv[1], sys.argv[0]))
