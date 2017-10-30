@@ -1,5 +1,6 @@
 import random
 import math
+from scipy.sparse import lil_matrix
 
 
 class Evaluator(object):
@@ -89,6 +90,24 @@ class Evaluator(object):
                 current_fold[playlist_index, track_index] = 0
         return current_fold, self.target_tracks[self.current_fold_index], self.test_dictionaries[self.current_fold_index].keys()
 
+    def get_test_matrix(self, fold, dataset):
+        """
+        Returns a lil matrix with ones when the item is in the test set
+        """
+        pl_list = list(self.test_dictionaries[fold].keys())
+        tr_list = list(self.target_tracks[fold])
+        n_playlist = len(pl_list)
+        n_tracks = len(tr_list)
+        test_M = lil_matrix((dataset.playlists_number, dataset.tracks_number))
+        for pl_index in range(0, n_playlist):
+            pl_id = pl_list[pl_index]
+            pl_index_m = dataset.get_playlist_index_from_id(pl_id)
+            for tr in self.test_dictionaries[fold][pl_id]:
+                tr_index = dataset.get_track_index_from_id(tr)
+                test_M[pl_index_m, tr_index] = 1
+
+        return test_M
+
     def evaluate_fold(self, recommendation):
         """
         recommendation is the dictionary of recommendation {'playlist ': list}
@@ -135,7 +154,6 @@ class Evaluator(object):
                 if tr_id not in self.test_dictionaries[self.current_fold_index][pl_id]:
                     print("Features:", dataset.tracks_final[tr_id])
             print("---------------------------------")
-
 
     def get_mean_map(self):
         """

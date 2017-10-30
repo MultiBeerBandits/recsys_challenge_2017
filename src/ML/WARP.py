@@ -14,29 +14,37 @@ class WARP():
         self.tr_id_list = None
         pass
 
-    def fit(self, urm, epochs, dataset, tg_playlist, tg_tracks):
+    def fit(self, urm, test_urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=100, item_alpha=1e-4, l_rate=5e-2):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
-        model = LightFM(loss='warp', random_state=2016)
+        model = LightFM(loss='warp', learning_rate=l_rate, random_state=2016, no_components=no_components, item_alpha=item_alpha, max_sampled=100,  learning_schedule='adagrad')
         # Initialize model.
-        model.fit(urm, epochs=0)
+        icm = dataset.build_icm().tocsr()
 
-        icm = dataset.build_icm()
+        # iterarray = range(10, 110, 10)
+
+        # patk_learning_curve(model, urm, test_urm, urm, iterarray, item_features=icm.transpose(), **{'num_threads': 4})
 
         model.fit_partial(urm,
-                          item_features=icm,
-                          epochs=epochs, **{'num_threads': 4})
+                          item_features=icm.transpose(),
+                          epochs=n_epochs, verbose=True, **{'num_threads': 4})
+        print("Training finished")
 
-        tr_indices = [dataset.get_track_index_from_id(x) for x in tg_tracks]
+        tr_indices = np.array(
+            [dataset.get_track_index_from_id(x) for x in tg_tracks])
 
         R_hat = lil_matrix((len(tg_playlist), len(tg_tracks)))
-        for u in tg_playlist:
-            u_id = dataset.get_playlist_index_from_id(u)
-            R_hat[u] = model.predict(u_id, tr_indices, num_threads=4)
-            print(R_hat[u])
+        cont = 0
+        for u_id in tg_playlist:
+            u_index = dataset.get_playlist_index_from_id(u_id)
+            R_hat[cont] = model.predict(
+                u_index, tr_indices, item_features=icm.transpose(), num_threads=4)
+            if cont % 1000 == 0:
+                print("Done: ", cont)
+            cont += 1
         self.R_hat = csr_matrix(R_hat)
 
-    def predict(self):
+    def predict(self, at=5):
         recs = {}
         for i in range(0, self.R_hat.shape[0]):
             pl_id = self.pl_id_list[i]
@@ -86,9 +94,10 @@ if __name__ == '__main__':
     for i in range(0, 5):
         warp = WARP()
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        warp.fit(urm, 20, ds, list(tg_playlist), list(tg_tracks))
+        test_urm = ev.get_test_matrix(i, ds)
+        warp.fit(urm, test_urm, ds, list(tg_playlist), list(tg_tracks))
         recs = warp.predict()
         ev.evaluate_fold(recs)
-        ev.print_worst(ds)
+        # ev.print_worst(ds)
     map_at_five = ev.get_mean_map()
     print("MAP@5 Final", map_at_five)
