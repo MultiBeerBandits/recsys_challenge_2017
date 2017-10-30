@@ -23,8 +23,7 @@ def objective(params):
     ev.cross_validation(5, ds.train_final.copy())
     warp = WARP()
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-    test_urm = ev.get_test_matrix(i, ds)
-    warp.fit(urm, test_urm, ds, list(tg_playlist), list(tg_tracks), l_rate=l_rate,
+    warp.fit(urm, ds, list(tg_playlist), list(tg_tracks), l_rate=l_rate,
              no_components=no_components, item_alpha=item_alpha, epochs=epochs)
     recs = warp.predict()
     map_at_five = ev.evaluate_fold(recs)

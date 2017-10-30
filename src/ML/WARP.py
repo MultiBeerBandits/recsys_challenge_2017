@@ -14,7 +14,7 @@ class WARP():
         self.tr_id_list = None
         pass
 
-    def fit(self, urm, test_urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=100, item_alpha=1e-4, l_rate=5e-2):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=100, item_alpha=1e-4, l_rate=5e-2):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         model = LightFM(loss='warp', learning_rate=l_rate, random_state=2016, no_components=no_components, item_alpha=item_alpha, max_sampled=100,  learning_schedule='adagrad')
