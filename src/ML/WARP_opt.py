@@ -28,7 +28,7 @@ def objective(params):
     recs = warp.predict()
     map_at_five = ev.evaluate_fold(recs)
     logging.info("MAP@5 Final" + str(map_at_five) + "Params:" +
-          str(epochs) + str(l_rate) + str(no_components) + str(item_alpha))
+          str(epochs) + " " + str(l_rate) + " " + str(no_components) + " " + str(item_alpha))
     # return negative since we want to maximize it and forest wants to minimize
     return -map_at_five
 
