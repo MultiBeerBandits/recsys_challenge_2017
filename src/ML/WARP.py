@@ -14,19 +14,24 @@ class WARP():
         self.tr_id_list = None
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=100, item_alpha=1e-4, l_rate=5e-2):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=50, n_epochs=200, item_alpha=1e-4, l_rate=5e-2):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         model = LightFM(loss='warp', learning_rate=l_rate, random_state=2016, no_components=no_components, item_alpha=item_alpha, max_sampled=100,  learning_schedule='adagrad')
         # Initialize model.
+        # Need an identity matrix stacked horizontaly
+        # Unknown reason, refer to:
+        # https://github.com/lyst/lightfm/blob/master/lightfm/lightfm.py
+        id_item = eye(urm.shape[1], urm.shape[1]).tocsr()
         icm = dataset.build_icm().tocsr()
+        icm_t = hstack((id_item, icm.transpose())).tocsr().astype(np.float32)
 
         # iterarray = range(10, 110, 10)
 
         # patk_learning_curve(model, urm, test_urm, urm, iterarray, item_features=icm.transpose(), **{'num_threads': 4})
 
         model.fit_partial(urm,
-                          item_features=icm.transpose(),
+                          item_features=icm_t,
                           epochs=n_epochs, verbose=True, **{'num_threads': 4})
         print("Training finished")
 
@@ -38,7 +43,7 @@ class WARP():
         for u_id in tg_playlist:
             u_index = dataset.get_playlist_index_from_id(u_id)
             R_hat[cont] = model.predict(
-                u_index, tr_indices, item_features=icm.transpose(), num_threads=4)
+                u_index, tr_indices, item_features=icm_t, num_threads=4)
             if cont % 1000 == 0:
                 print("Done: ", cont)
             cont += 1
@@ -95,7 +100,7 @@ if __name__ == '__main__':
         warp = WARP()
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         test_urm = ev.get_test_matrix(i, ds)
-        warp.fit(urm, test_urm, ds, list(tg_playlist), list(tg_tracks))
+        warp.fit(urm, ds, list(tg_playlist), list(tg_tracks))
         recs = warp.predict()
         ev.evaluate_fold(recs)
         # ev.print_worst(ds)

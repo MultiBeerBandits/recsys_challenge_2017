@@ -35,9 +35,9 @@ def objective(params):
 
 def learn_hyperparams():
     # define the space
-    space = [(50, 260),  # epochs
+    space = [(70, 300),  # epochs
              (10**-3, 1.0, 'log-uniform'),  # learning_rate
-             (20, 200),  # no_components
+             (100, 500),  # no_components
              (10**-5, 10**-3, 'log-uniform'),  # item_alpha
              ]
     best_result = forest_minimize(objective, space, n_calls=100,
