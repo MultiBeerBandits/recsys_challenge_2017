@@ -37,7 +37,7 @@ class ContentBasedFiltering(object):
         icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
         # Get tags feature matrix and build the aggregated weighted matrix
         tags = dataset.build_tags_matrix()
-        tags = build_aggregated_feature_space(tags, n_features=3, topK=10)
+        tags = build_aggregated_feature_space(tags, n_features=3, topK=100)
         # Stack the ICM on top of aggregated weighted tags features
         icm = vstack((icm, tags))
         print("SHAPE of ICM: ", icm.shape)

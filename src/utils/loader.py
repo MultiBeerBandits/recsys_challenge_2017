@@ -508,12 +508,10 @@ def most_popular_features(icm, topK):
     """
     # Sum the columns to get the number of items each feature appears in
     popularity = csc_matrix(icm.sum(axis=1))
-    print(popularity.shape)
     # Get the indices of the topK ones
     data = popularity.data[popularity.indptr[0]:popularity.indptr[1]]
     popular_indices = np.argpartition(data,
                                       len(data) - topK)[-topK:]
-    print(popular_indices.shape)
     return popular_indices
 
 
@@ -537,7 +535,7 @@ def aggregate_features(icm, n_features, topK):
     features_indices = product(range(topKICM.shape[0]), repeat=n_features)
     print('Aggregating features...')
     for i, t in enumerate(features_indices):
-        if i % 50 == 0:
+        if i % 1000 == 0:
             print('{:d} sets of features aggregated...'.format(i))
         # The features to aggregate must all distinct
         if len(t) != len(set(t)):
