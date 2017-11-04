@@ -4,6 +4,7 @@ import numpy as np
 import numpy.linalg as la
 import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
+from src.utils.feature_weighting import *
 
 
 class ContentBasedFiltering(object):
@@ -34,7 +35,8 @@ class ContentBasedFiltering(object):
         S = None
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
+        # icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
+        icm = get_icm_weighted_chi2(urm, dataset.build_icm())
         print("SHAPE of ICM: ", icm.shape)
         # apply tfidf
         # transformer = TfidfTransformer()
@@ -53,6 +55,8 @@ class ContentBasedFiltering(object):
         # clean the transposed matrix, we do not need tracks not target
         icm_t = icm_t[[dataset.get_track_index_from_id(x)
                        for x in self.tr_id_list]]
+        icm_ones = icm.copy()
+        icm_ones[icm_ones.nonzero()] = 1
         chunksize = 1000
         mat_len = icm_t.shape[0]
         for chunk in range(0, mat_len, chunksize):
@@ -68,8 +72,6 @@ class ContentBasedFiltering(object):
             # compute common features
             icm_t_ones = icm_t[chunk:end]
             icm_t_ones[icm_t_ones.nonzero()] = 1
-            icm_ones = icm.copy()
-            icm_ones[icm_ones.nonzero()] = 1
             S_num = icm_t_ones.dot(icm_ones)
             S_den = S_num.copy()
             S_den.data += shrinkage

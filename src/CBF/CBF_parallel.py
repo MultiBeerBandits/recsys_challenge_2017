@@ -36,7 +36,7 @@ class ContentBasedFiltering(object):
         S = None
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
+        icm = dataset.build_icm()
         print("SHAPE of ICM: ", icm.shape)
         # apply tfidf
         # transformer = TfidfTransformer()
@@ -91,7 +91,9 @@ class ContentBasedFiltering(object):
 
         pool.close()
         pool.join()
-        print("Similarity matrix ready, let's normalize it!")
+
+        end = time.time()
+        print("Similarity matrix ready, normalize it! Elapsed:", end - start)
         # zero out diagonal
         # in the diagonal there is the sim between i and i (1)
         # maybe it's better to have a lil matrix here
@@ -202,6 +204,27 @@ if __name__ == '__main__':
         cbf.fit(urm, list(tg_playlist), list(tg_tracks), ds)
         recs = cbf.predict()
         ev.evaluate_fold(recs)
+        ev.print_worst(ds)
     map_at_five = ev.get_mean_map()
     print("MAP@5 Final", map_at_five)
-
+    # export csv
+    cbf_exporter = ContentBasedFiltering()
+    urm = ds.build_train_matrix()
+    tg_playlist = list(ds.target_playlists.keys())
+    tg_tracks = list(ds.target_tracks.keys())
+    # Train the model with the best shrinkage found in cross-validation
+    cbf_exporter.fit(urm,
+                     tg_playlist,
+                     tg_tracks,
+                     ds)
+    recs = cbf_exporter.predict()
+    with open('submission_cbf.csv', mode='w', newline='') as out:
+        fieldnames = ['playlist_id', 'track_ids']
+        writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
+        writer.writeheader()
+        for k in tg_playlist:
+            track_ids = ''
+            for r in recs[k]:
+                track_ids = track_ids + r + ' '
+            writer.writerow({'playlist_id': k,
+                             'track_ids': track_ids[:-1]})

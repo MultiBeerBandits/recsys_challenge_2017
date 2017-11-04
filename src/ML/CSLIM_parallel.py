@@ -13,7 +13,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=1e-5, l2_reg=1e-6, feature_reg=2):
+    def __init__(self, l1_reg=7e-6, l2_reg=5e-5, feature_reg=4):
         """
         On 2017-10-22 we scored 0.081887527481395 with
             l1_reg=0.00001,
@@ -42,14 +42,15 @@ class SLIM():
 
         # Set ICM weights
         dataset.set_track_attr_weights(art_w=1,
-                                       alb_w=1,
+                                       alb_w=0.9,
                                        dur_w=0.2,
                                        playcount_w=0.2,
                                        tags_w=0.2)
 
         # get icm
-        icm = dataset.add_playlist_to_icm(
-            dataset.build_icm(), 0.5) * np.sqrt(self.feature_reg)
+        # icm = dataset.add_playlist_to_icm(
+        #    dataset.build_icm(), 0.5) * np.sqrt(self.feature_reg)
+        icm = dataset.build_icm() * np.sqrt(self.feature_reg)
         # Apply tf idf
         # transformer = TfidfTransformer()
         # icm = transformer.fit_transform(icm.transpose()).transpose()
@@ -178,6 +179,7 @@ if __name__ == '__main__':
         ubf.fit(urm, list(tg_tracks), list(tg_playlist), ds)
         recs = ubf.predict()
         ev.evaluate_fold(recs)
+        ev.print_worst(ds)
     map_at_five = ev.get_mean_map()
     print("MAP@5 Final", map_at_five)
     # export
