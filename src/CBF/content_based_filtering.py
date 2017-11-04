@@ -3,7 +3,6 @@ from scipy.sparse import *
 import numpy as np
 import numpy.linalg as la
 import scipy.sparse.linalg as sLA
-from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 
 
@@ -35,8 +34,12 @@ class ContentBasedFiltering(object):
         S = None
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
-        # icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
-        icm = get_icm_weighted_chi2(urm, dataset.build_icm())
+        icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
+        # Get tags feature matrix and build the aggregated weighted matrix
+        tags = dataset.build_tags_matrix()
+        tags = build_aggregated_feature_space(tags, n_features=3, topK=10)
+        # Stack the ICM on top of aggregated weighted tags features
+        icm = vstack((icm, tags))
         print("SHAPE of ICM: ", icm.shape)
         # apply tfidf
         # transformer = TfidfTransformer()
@@ -115,7 +118,7 @@ class ContentBasedFiltering(object):
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
         # eliminate playlist that are not target, already done, to check
-        #R_hat = R_hat[:, [dataset.get_track_index_from_id(
+        # R_hat = R_hat[:, [dataset.get_track_index_from_id(
         #    x) for x in self.tr_id_list]]
         print("Shape of final matrix: ", R_hat.shape)
         self.R_hat = R_hat

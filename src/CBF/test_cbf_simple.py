@@ -13,7 +13,7 @@ def main():
     # shr_w = 100
     # k_f = 50
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
+    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.0)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()

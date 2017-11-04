@@ -135,6 +135,24 @@ class Dataset():
                     playcount_index+=1
         return icm
 
+    def build_tags_matrix(self, path='./data/tracks_final.csv'):
+        """
+        Builds a (n_tags, n_tracks) sparse matrix out of the
+        tags from the dataset
+        """
+        tags_matrix = lil_matrix((self.attrs_number, self.tracks_number))
+        with open(path, newline='') as csv_file:
+            reader = csv.DictReader(csv_file, delimiter='\t')
+            for row in reader:
+                tags = parse_csv_array(row['tags'])
+                # get index of this track
+                track_index = self.track_id_mapper[row['track_id']]
+                for tag in tags:
+                    if tag in self.track_attr_mapper['tags']:
+                        tag_index = self.track_attr_mapper['tags'][tag]
+                        tags_matrix[tag_index, track_index] = 1
+        return tags_matrix
+
     def build_train_matrix(self, filename='csr_urm.npz'):
         """
         Builds the user rating matrix from the dataset.
@@ -475,3 +493,82 @@ def load_sparse_matrix(filename):
     m = csr_matrix((loader['data'], loader['indices'], loader['indptr']),
                    shape=loader['shape']).tolil()
     return m
+
+
+def most_popular_features(icm, topK):
+    """
+    Returns the row indices of the most topK most popular features.
+    By most popular we mean those that appear the highest number
+    of items.
+
+    ICM: sparse (n_features, n_items) matrix
+    topK: int
+
+    Returns a topK-long array of indices
+    """
+    # Sum the columns to get the number of items each feature appears in
+    popularity = csc_matrix(icm.sum(axis=1))
+    print(popularity.shape)
+    # Get the indices of the topK ones
+    data = popularity.data[popularity.indptr[0]:popularity.indptr[1]]
+    popular_indices = np.argpartition(data,
+                                      len(data) - topK)[-topK:]
+    print(popular_indices.shape)
+    return popular_indices
+
+
+def aggregate_features(icm, n_features, topK):
+    """
+    Performs feature aggregation as described in [1]
+
+    ICM: sparse matrix - The features matrix with unitary entries.
+    N_FEATURES: int - The number of features aggregated in each set.
+    TOP_K: int - The number of top features to be aggregated.
+
+    Returns a roughly (top_k ** n_features, icm.shape[1]) sparse matrix
+
+    [1]: Daniele Grattarola et al 2017. Content-Based approaches for Cold-Start
+         Job Recommendations
+    """
+    from itertools import product
+    final = None
+    topKICM = icm[most_popular_features(icm, topK)]
+    # Build the list of tuples of feature indices to aggregate
+    features_indices = product(range(topKICM.shape[0]), repeat=n_features)
+    print('Aggregating features...')
+    for i, t in enumerate(features_indices):
+        if i % 50 == 0:
+            print('{:d} sets of features aggregated...'.format(i))
+        # The features to aggregate must all distinct
+        if len(t) != len(set(t)):
+            continue
+        # If all distinct, perform an element-wise logical AND
+        # of the feature vectors
+        aggr = np.ones((1, topKICM.shape[1]))
+        for index in t:
+            aggr = topKICM.getrow(index).multiply(aggr)
+        aggr = csr_matrix(aggr)
+
+        # Stack current aggregation over final matrix
+        if final is None:
+            final = aggr
+        else:
+            final = vstack((final, aggr), format='csr')
+    return final
+
+
+def build_aggregated_feature_space(icm, n_features, topK):
+    """
+    Builds a weighted aggregated icm from input parameter ICM.
+    We perform feature aggregation first of the TOPK features in
+    ICM, then we stack those aggregated features over the ICM and
+    run TF-IDF rescaled to [0, 1].
+    """
+    from sklearn.feature_extraction.text import TfidfTransformer
+    aggregated_f = aggregate_features(icm, n_features, topK)
+    extended_icm = vstack((icm, aggregated_f), format='csr')
+    print('Computing TF-IDF...')
+    transformer = TfidfTransformer(norm='l2', use_idf=True,
+                                   smooth_idf=True, sublinear_tf=False)
+    tfidf = transformer.fit_transform(extended_icm)
+    return tfidf
