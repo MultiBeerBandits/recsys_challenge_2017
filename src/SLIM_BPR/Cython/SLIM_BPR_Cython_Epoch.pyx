@@ -40,6 +40,7 @@ cdef class SLIM_BPR_Cython_Epoch:
     cdef int useAdaGrad, rmsprop
 
     cdef float learning_rate
+    cdef float lambda_i, lambda_j
 
     cdef int batch_size, sparse_weights
     cdef long[:] eligibleUsers
@@ -57,7 +58,12 @@ cdef class SLIM_BPR_Cython_Epoch:
 
     def __init__(self, URM_mask, sparse_weights, eligibleUsers,# S,
                  learning_rate = 0.05,
+                 lambda_i=0.0025, lambda_j=0.00025,
                  batch_size = 1, topK=False, sgd_mode='adagrad'):
+        """
+        URM_mask: URM matrix whose entries are 1 if rating > threshold, 0 otherwise.
+        sparse_weights: if True use sparse matrix for Weights matrix. Otherwise it's dense.
+        """
 
         super(SLIM_BPR_Cython_Epoch, self).__init__()
 
@@ -95,6 +101,8 @@ cdef class SLIM_BPR_Cython_Epoch:
 
 
         self.learning_rate = learning_rate
+        self.lambda_i = lambda_i
+        self.lambda_j = lambda_j
 
         self.batch_size = batch_size
 
@@ -142,7 +150,7 @@ cdef class SLIM_BPR_Cython_Epoch:
 
 
 
-        # Uniform user sampling without replacement
+        # Uniform user sampling with replacement
         for numCurrentBatch in range(totalNumberOfBatch):
 
             sample = self.sampleBatch_Cython()
@@ -197,12 +205,15 @@ cdef class SLIM_BPR_Cython_Epoch:
                 index +=1
 
                 if self.sparse_weights:
-
+                    # Original algorithm was missing the reg term.
+                    # Here we sum to the gradient lambda_i * s_i,seenItem 
                     if seenItem != i:
-                        self.S_sparse.add_value(i, seenItem, self.learning_rate * gradient)
-
+                        reg_i_seenItem = self.lambda_i * self.S_sparse.get_value(i, seenItem)
+                        self.S_sparse.add_value(i, seenItem, self.learning_rate * (gradient + reg_i_seenItem))
+                    # Here we sum to the gradient lambda_j * s_j,seenItem 
                     if seenItem != j:
-                        self.S_sparse.add_value(j, seenItem, -self.learning_rate * gradient)
+                        reg_j_seenItem = self.lambda_j * self.S_sparse.get_value(j, seenItem)
+                        self.S_sparse.add_value(j, seenItem, self.learning_rate * (-gradient + reg_j_seenItem))
 
                 else:
 
