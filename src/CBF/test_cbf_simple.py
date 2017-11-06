@@ -14,14 +14,16 @@ def main():
     # k_f = 50
     ds = Dataset(load_tags=True, filter_tag=True)
     ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
+    ds.set_playlist_attr_weights(0.2, 0.2, 0.2)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+        test_dict = ev.get_test_dict(i)
         cbf.fit(urm, tg_playlist,
                 tg_tracks,
-                ds)
+                ds, test_dict=test_dict)
         recs = cbf.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()

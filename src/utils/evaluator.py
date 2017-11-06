@@ -90,6 +90,12 @@ class Evaluator(object):
                 current_fold[playlist_index, track_index] = 0
         return current_fold, self.target_tracks[self.current_fold_index], self.test_dictionaries[self.current_fold_index].keys()
 
+    def get_test_dict(self, fold_index):
+        """
+        Returns the test dictionary of the current fold
+        """
+        return self.test_dictionaries[fold_index]
+
     def get_test_matrix(self, fold, dataset):
         """
         Returns a lil matrix with ones when the item is in the test set

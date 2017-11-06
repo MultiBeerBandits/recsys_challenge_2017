@@ -20,6 +20,7 @@ import numpy as np
 cimport numpy as np
 import time
 import sys
+import scipy.sparse as sp
 
 from libc.math cimport exp, sqrt
 from libc.stdlib cimport rand, RAND_MAX
@@ -56,20 +57,21 @@ cdef class SLIM_BPR_Cython_Epoch:
     cdef double[:,:] S_dense
 
 
-    def __init__(self, URM_mask, sparse_weights, eligibleUsers,# S,
+    def __init__(self, URM_mask, sparse_weights, eligibleUsers, S=None,
                  learning_rate = 0.05,
                  lambda_i=0.0025, lambda_j=0.00025,
                  batch_size = 1, topK=False, sgd_mode='adagrad'):
         """
         URM_mask: URM matrix whose entries are 1 if rating > threshold, 0 otherwise.
         sparse_weights: if True use sparse matrix for Weights matrix. Otherwise it's dense.
+        S: starting similarity matrix
         """
 
         super(SLIM_BPR_Cython_Epoch, self).__init__()
 
         URM_mask = check_matrix(URM_mask, 'csr')
 
-        self.numPositiveIteractions = int(URM_mask.nnz * 1)
+        self.numPositiveIteractions = int(URM_mask.nnz * 5)
         self.n_users = URM_mask.shape[0]
         self.n_items = URM_mask.shape[1]
         self.topK = topK
@@ -81,7 +83,10 @@ cdef class SLIM_BPR_Cython_Epoch:
         if self.sparse_weights:
 
             self.S_sparse = Sparse_Matrix_Tree_CSR(self.n_items, self.n_items)
-
+                # if S is not None convert it to Sparse Matrix Tree by adding its values to it
+            if S is not None:
+                print("Using already init S")
+                self.build_S(S)
         else:
             self.S_dense = np.zeros((self.n_items, self.n_items), dtype=np.float64)
 
@@ -268,7 +273,21 @@ cdef class SLIM_BPR_Cython_Epoch:
             else:
                 return similarityMatrixTopK(np.array(self.S_dense.T), k=self.topK, forceSparseOutput=True, inplace=True).T
 
-
+    def build_S(self,S):
+        """
+        S is scipy sparse matrix
+        this method converts the matrix into a Sparse Matrix Tree CSR
+        """
+        # first transpose the matrix since here we need to handle it by row
+        S = S.transpose()
+        for r in range(S.shape[0]):
+            # get all the element
+            row = S.data[S.indptr[r]:S.indptr[r+1]]
+            columns = S.indices[S.indptr[r]:S.indptr[r+1]]
+            for i in range(row.shape[0]):
+                self.S_sparse.add_value(r, columns[i], row[i])
+        # rebalance the tree
+        self.S_sparse.rebalance_tree()    
 
 
     cdef BPR_sample sampleBatch_Cython(self):

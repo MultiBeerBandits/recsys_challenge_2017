@@ -6,6 +6,7 @@ import time
 import pandas as pd
 # Cluster stuff
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import normalize
 
 
 class Dataset():
@@ -25,6 +26,8 @@ class Dataset():
         self.duration_intervals = 20
         self.playcount_intervals = 20
         self.pop_threshold = 5
+        # for created_at of playlists
+        self.created_at_intervals = 30
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}
@@ -42,8 +45,8 @@ class Dataset():
         # format: {column index: 'playlist_id'}
         # playlist_attr_mapper maps attributes to row index
         # format: {'title': {'title_key': row_index}}
-        self.playlist_id_mapper, self.playlist_index_mapper, self.playlist_attr_mapper = build_playlists_mappers(
-            self.prefix + 'playlists_final.csv')
+        self.playlist_id_mapper, self.playlist_index_mapper, self.playlist_attr_mapper, self.playlist_attrs_number = build_playlists_mappers(
+            self.prefix + 'playlists_final.csv', self)
         # number of playlists
         self.playlists_number = len(self.playlist_id_mapper.keys())
         # number of tracks
@@ -56,14 +59,20 @@ class Dataset():
                                          'playlist_id')
         self.target_tracks = load_csv(self.prefix + 'target_tracks.csv',
                                       'track_id')
+        # Train final is a dict with pl_key tracks
         self.train_final = load_train_final(self.prefix + 'train_final.csv')
 
-        # weights of attributes
+        # weights of attributes of tracks
         self.artist_weight = 1
         self.album_weight = 1
         self.duration_weight = 1
         self.playcount_weight = 1
         self.tags_weight = 1
+
+        # weights of attributes of playlist
+        self.created_at_weight = 1
+        self.owner_weight = 1
+        self.title_weight = 1
 
     def set_track_attr_weights(self, art_w, alb_w, dur_w, playcount_w, tags_w):
         self.artist_weight = art_w
@@ -71,6 +80,11 @@ class Dataset():
         self.duration_weight = dur_w
         self.playcount_weight = playcount_w
         self.tags_weight = tags_w
+
+    def set_playlist_attr_weights(self, created_at_weight, owner_weight, title_weight):
+        self.created_at_weight = created_at_weight
+        self.owner_weight = owner_weight
+        self.title_weight = title_weight
 
     def build_icm(self, path='./data/tracks_final.csv'):
         """
@@ -102,7 +116,8 @@ class Dataset():
                     for tag in tags:
                         if tag in self.track_attr_mapper['tags']:
                             tag_index = self.track_attr_mapper['tags'][tag]
-                            tag_weight = self.tag_counter[tag] * self.tags_weight
+                            tag_weight = self.tag_counter[tag] * \
+                                self.tags_weight
                             icm[tag_index, track_index] = tag_weight
                 # duration
                 duration = row['duration']
@@ -118,7 +133,7 @@ class Dataset():
                         duration_offset
                     icm[duration_index, track_index] = self.duration_weight
                     # go ahead with duration index
-                    duration_index+=1
+                    duration_index += 1
                 # playcount
                 playcount = row['playcount']
                 if playcount is not None and playcount != '' and float(playcount) != -1:
@@ -132,8 +147,55 @@ class Dataset():
                     playcount_index = self.track_attr_mapper['playcount'] + \
                         playcount_offset
                     icm[playcount_index, track_index] = self.playcount_weight
-                    playcount_index+=1
+                    playcount_index += 1
         return icm
+
+    def build_iucm(self, test_dict, path='./data/playlists_final'):
+        """
+        test_dict is a dict like {pl_id : [tracks]}
+        Do not add attributes if track is in test_dict[pl_id]
+        Returns an item content matrix derived from user features
+        Each items contains the feature of the playlist in which is present
+        Rationale:
+        two items are similar if the playlist in which they appear are similar:
+        example: same user, similar creation time, similar titles.
+        """
+        iucm = lil_matrix((self.playlist_attrs_number, self.tracks_number))
+        # for each playlist get its tracks and add its attributes
+        # tracks of a playlist are the indices of urm
+        # keep track of the index for cluster of created at
+        index = 0
+        for pl_id in self.playlists_final.keys():
+            # check, some playlists are not in the training set
+            if pl_id in self.train_final.keys():
+                # get tracks_id of the current playlist
+                tracks = self.train_final[pl_id]
+                # clean from tracks in test_dict[pl_id]
+                tracks = [x for x in tracks if not pl_id in test_dict.keys() or x not in test_dict[pl_id]]
+                # get attributes of the playlist
+                # get created at
+                created_at_offset = self.created_at_cluster[index]
+                created_at_index = self.playlist_attr_mapper['created_at'] + \
+                    created_at_offset
+                # get owner
+                owner = self.playlists_final[pl_id]['owner']
+                owner_index = self.playlist_attr_mapper['owner'][owner]
+                # get title
+                title = self.playlists_final[pl_id]['title']
+                # array of word of the title
+                title_array = parse_csv_array(title)
+                title_index_array = [
+                    self.playlist_attr_mapper['title'][x] for x in title_array]
+                for track in tracks:
+                    # get index
+                    tr_index = self.get_track_index_from_id(track)
+                    iucm[created_at_index, tr_index] += self.created_at_weight
+                    iucm[owner_index, tr_index] += self.owner_weight
+                    for title_index in title_index_array:
+                        iucm[title_index, tr_index] += self.title_weight
+            index += 1
+        iucm = normalize(iucm, axis=0) * 0.05
+        return iucm
 
     def build_train_matrix(self, filename='csr_urm.npz'):
         """
@@ -193,6 +255,15 @@ class Dataset():
         urm_weighted = urm * urm_weight
         return vstack([icm, urm_weighted])
 
+    def add_playlist_attr_to_icm(self, icm, test_dict):
+        """
+        Adds to the current icm the iucm, that is the
+        item user content matrix
+        for each tracks add the attribute of playlists in which is present
+        """
+        iucm = self.build_iucm(test_dict)
+        return vstack([icm, iucm])
+
 
 def load_train_final(path):
     res = {}
@@ -239,8 +310,8 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     max_playcount = 0
     min_duration = 224000
     max_duration = 224000
-    durations = [] # array of duration for dividing it in bins
-    playcounts = [] # the same as before
+    durations = []  # array of duration for dividing it in bins
+    playcounts = []  # the same as before
     with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file, delimiter='\t')
         for row in reader:
@@ -262,7 +333,7 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
             if row['duration'] is not None and row['duration'] != '':
                 duration = float(row['duration'])
                 # threshold for max and cleaning
-                if duration != -1: # and duration / 1000 < 700:
+                if duration != -1:  # and duration / 1000 < 700:
                     if duration < min_duration:
                         min_duration = duration
                     if duration > max_duration:
@@ -311,8 +382,10 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
     dataset.min_duration = min_duration
     dataset.min_playcount = min_playcount
     # for dividing in equal ranges
-    _, duration_bins = pd.qcut(durations, dataset.duration_intervals, retbins=True)
-    _, playcount_bins = pd.qcut(playcounts, dataset.playcount_intervals, retbins=True)
+    _, duration_bins = pd.qcut(
+        durations, dataset.duration_intervals, retbins=True)
+    _, playcount_bins = pd.qcut(
+        playcounts, dataset.playcount_intervals, retbins=True)
     dataset.duration_bins = duration_bins
     dataset.playcount_bins = playcount_bins
     # set index of duration and playcount
@@ -363,7 +436,7 @@ def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=Fal
             if row['duration'] is not None and row['duration'] != '':
                 duration = float(row['duration'])
                 # threshold for max and cleaning
-                if duration != -1: # and duration / 1000 < 700:
+                if duration != -1:  # and duration / 1000 < 700:
                     durations.append(duration)
             if row['playcount'] is not None and row['playcount'] != '':
                 playcount = float(row['playcount'])
@@ -395,8 +468,10 @@ def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=Fal
                 attr_index += 1
 
     #  Divide duration and playcount in cluster
-    dataset.duration_cluster = KMeans(n_clusters=dataset.duration_intervals).fit_predict(np.reshape(durations,(-1,1)))
-    dataset.playcount_cluster = KMeans(n_clusters=dataset.playcount_intervals).fit_predict(np.reshape(playcounts,(-1,1)))
+    dataset.duration_cluster = KMeans(
+        n_clusters=dataset.duration_intervals).fit_predict(np.reshape(durations, (-1, 1)))
+    dataset.playcount_cluster = KMeans(
+        n_clusters=dataset.playcount_intervals).fit_predict(np.reshape(playcounts, (-1, 1)))
     # set index of duration and playcount
     mapper['duration'] = attr_index
     mapper['playcount'] = attr_index + dataset.duration_intervals
@@ -411,15 +486,17 @@ def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=Fal
     return track_id_mapper, track_index_mapper, mapper, attr_index, tag_counter
 
 
-def build_playlists_mappers(path):
+def build_playlists_mappers(path, dataset):
     """
     Builds the mapper for playlist
     """
-    attrs = {'title': set(), 'owner': set()}
+    attrs = {'title': set(), 'owner': set(), 'created_at': 0}
     # mapper from playlist id to row index
     playlist_id_mapper = {}
     # mapper from row index to playlist id
     playlists_index_mapper = {}
+    # array of creation time for dividing it into cluster
+    created_at = []
     playlist_index = 0
     with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file, delimiter='\t')
@@ -429,6 +506,7 @@ def build_playlists_mappers(path):
                 attrs['title'].add(title)
             owner = row['owner']
             attrs['owner'].add(owner)
+            created_at.append(row['created_at'])
             playlist_id_mapper[row['playlist_id']] = playlist_index
             playlists_index_mapper[playlist_index] = row['playlist_id']
             playlist_index += 1
@@ -440,7 +518,11 @@ def build_playlists_mappers(path):
     for v in attrs['owner']:
         mapper['owner'][v] = attr_index
         attr_index += 1
-    return playlist_id_mapper, playlists_index_mapper, attrs
+    mapper['created_at'] = attr_index
+    attr_index += dataset.created_at_intervals + 1
+    dataset.created_at_cluster = KMeans(
+        n_clusters=dataset.created_at_intervals).fit_predict(np.reshape(created_at, (-1, 1)))
+    return playlist_id_mapper, playlists_index_mapper, mapper, attr_index
 
 
 def parse_csv_array(arr_str):

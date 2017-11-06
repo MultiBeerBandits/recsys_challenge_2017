@@ -41,18 +41,39 @@ def km_sse_playcount():
                 playcounts.append(float(playcount))
     playcounts = np.array(playcounts)
     sse = []
-    for i in range(8, 30):
+    for i in range(10, 40):
         k_m = KMeans(n_clusters=i)
         play_cluster = k_m.fit_predict(np.reshape(playcounts, (-1, 1)))
         print((k_m.inertia_ / len(playcounts)) / 1e4)
         sse.append((k_m.inertia_ / len(playcounts)) / 1e4)
     fig, ax = plt.subplots()
-    plt.plot(range(8, 30), sse, 'ro')
+    plt.plot(range(10, 40), sse, 'ro')
     plt.ylabel("SSE for playcount")
     plt.xlabel("Cluster Size")
     plt.title("Playcount SSE")
     plt.show()
 
+def km_sse_created_at():
+    created_ats = []
+    with open('./data/playlists_final.csv', newline='') as csv_file:
+        reader = csv.DictReader(csv_file, delimiter='\t')
+        for row in reader:
+            # duration
+            created_at = row['created_at']
+            created_ats.append(float(created_at))
+    created_ats = np.array(created_ats)
+    sse = []
+    for i in range(10, 40):
+        k_m = KMeans(n_clusters=i)
+        created_cluster = k_m.fit_predict(np.reshape(created_ats, (-1, 1)))
+        print((k_m.inertia_ / len(created_ats)) / 1e4)
+        sse.append((k_m.inertia_ / len(created_ats)) / 1e4)
+    fig, ax = plt.subplots()
+    plt.plot(range(10, 40), sse, 'ro')
+    plt.ylabel("SSE for Created At")
+    plt.xlabel("Cluster Size")
+    plt.title("Create at SSE")
+    plt.show()
 
 def plot_duration():
     durations = []
@@ -132,5 +153,27 @@ def plot_tags():
     plt.show()
 
 
+def plot_created_at():
+    created_ats = []
+    with open('./data/playlists_final.csv', newline='') as csv_file:
+        reader = csv.DictReader(csv_file, delimiter='\t')
+        for row in reader:
+            # duration
+            created_at = row['created_at']
+            created_ats.append(float(created_at))
+    created_ats = np.array(created_ats)
+    fig, ax = plt.subplots()
+    ax.scatter(created_ats, np.ones_like(created_ats))
+    plt.show()
+    # Do K-means
+    created_at_cluster = KMeans(n_clusters=20).fit_predict(
+        np.reshape(created_ats, (-1, 1)))
+    fig, ax = plt.subplots()
+    ax.scatter(created_ats[:100], np.zeros_like(
+        created_ats[:100]), c=created_at_cluster[:100])
+    plt.show()
+
+
+
 if __name__ == '__main__':
-    plot_tags()
+    km_sse_created_at()

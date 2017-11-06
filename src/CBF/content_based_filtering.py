@@ -18,7 +18,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=100):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200, test_dict={}):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -35,8 +35,9 @@ class ContentBasedFiltering(object):
         S = None
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
-        # icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
-        icm = get_icm_weighted_chi2(urm, dataset.build_icm())
+        icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
+        icm = dataset.add_playlist_attr_to_icm(icm, test_dict)
+        # icm = get_icm_weighted_chi2(urm, dataset.build_icm())
         print("SHAPE of ICM: ", icm.shape)
         # apply tfidf
         # transformer = TfidfTransformer()

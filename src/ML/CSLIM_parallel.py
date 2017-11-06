@@ -13,7 +13,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=7e-6, l2_reg=5e-5, feature_reg=4):
+    def __init__(self, l1_reg=1e-5, l2_reg=1e-6, feature_reg=2):
         """
         On 2017-10-22 we scored 0.081887527481395 with
             l1_reg=0.00001,
@@ -34,11 +34,15 @@ class SLIM():
         self.R_hat = None
         self.pl_id_list = None
         self.tr_id_list = None
+        self.dataset = None
 
-    def fit(self, urm, target_items, target_users, dataset):
+    def fit(self, urm, target_items, target_users, dataset, test_dict=None):
         # Store target playlists and tracks
         self.pl_id_list = list(target_users)
         self.tr_id_list = list(target_items)
+
+        # store dataset
+        self.dataset = dataset
 
         # Set ICM weights
         dataset.set_track_attr_weights(art_w=1,
@@ -46,11 +50,12 @@ class SLIM():
                                        dur_w=0.2,
                                        playcount_w=0.2,
                                        tags_w=0.2)
-
-        # get icm
-        # icm = dataset.add_playlist_to_icm(
-        #    dataset.build_icm(), 0.5) * np.sqrt(self.feature_reg)
-        icm = dataset.build_icm() * np.sqrt(self.feature_reg)
+        # Use the iucm
+        dataset.set_playlist_attr_weights(0.01, 0.01, 0.01)
+        icm = dataset.build_icm()
+        # icm = dataset.add_playlist_attr_to_icm(icm, test_dict)
+        # weight icm
+        icm = icm * np.sqrt(self.feature_reg)
         # Apply tf idf
         # transformer = TfidfTransformer()
         # icm = transformer.fit_transform(icm.transpose()).transpose()
@@ -140,6 +145,12 @@ class SLIM():
             tracks_ids = [self.tr_id_list[x] for x in track_cols]
             recs[pl_id] = tracks_ids
         return recs
+
+    def getW(self):
+        """
+        Returns the similary matrix with dimensions I x I
+        """
+        return self.W
 
 
 def _work(params):

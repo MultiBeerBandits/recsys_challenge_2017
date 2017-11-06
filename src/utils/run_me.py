@@ -16,10 +16,10 @@ def run_SLIM():
     
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
     test_urm = ev.get_test_matrix(0, ds)
-    recommender = SLIM_BPR_Cython(urm.tocsr(), recompile_cython=False, positive_threshold=1, sparse_weights=True)
+    recommender = SLIM_BPR_Cython(urm.tocsr(), ev=ev, dataset=ds, tg_tracks=tg_tracks, tg_playlist=tg_playlist, recompile_cython=True, positive_threshold=1, sparse_weights=True)
     logFile = open("SLIM_BPR_Cython.txt", "a")
-    recommender.fit(epochs=1000, validate_every_N_epochs=10, URM_test=test_urm.tocsr(),
-                logFile=logFile, batch_size=1, sgd_mode='sgd', learning_rate=5e-2, lambda_i=1e-3, lambda_j=1e-3)
+    recommender.fit(epochs=1000, validate_every_N_epochs=5, URM_test=test_urm.tocsr(),
+                logFile=logFile, batch_size=1, sgd_mode='adagrad', learning_rate=5e-3, lambda_i=1e-3, lambda_j=1e-3)
         # ev.print_worst(ds)
 
 
