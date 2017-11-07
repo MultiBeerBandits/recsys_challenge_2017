@@ -2,7 +2,7 @@
 from src.SLIM_BPR.Cython.SLIM_BPR_Cython import SLIM_BPR_Cython
 from src.utils.loader import *
 from src.utils.evaluator import *
-from src.ML.CSLIM_parallel import *
+from src.CBF.CBF_tfidf import *
 import numpy as np
 
 """
@@ -21,17 +21,17 @@ def run():
     test_urm = ev.get_test_matrix(0, ds)
     test_dict = ev.get_test_dict(0)
     # run cslim
-    slim = SLIM()
-    slim.fit(urm, tg_tracks, tg_playlist, ds, test_dict=test_dict)
-    rec = slim.predict()
+    cbf = ContentBasedFiltering()
+    cbf.fit(urm, tg_playlist, tg_tracks, ds, test_dict=test_dict)
+    rec = cbf.predict()
     ev.evaluate_fold(rec)
     # get the similarity matrix
-    S = slim.getW()
+    S = cbf.getW().tocsr()
     # pass it to the bpr algorithm
     recommender = SLIM_BPR_Cython(urm.tocsr(), tg_playlist=tg_playlist, tg_tracks=tg_tracks, ev=ev, dataset=ds, recompile_cython=True, positive_threshold=1, sparse_weights=True)
     logFile = open("SLIM_BPR_Cython.txt", "a")
     recommender.fit(S=S, epochs=1000, validate_every_N_epochs=1, URM_test=test_urm.tocsr(),
-                logFile=logFile, batch_size=1, sgd_mode='adagrad', learning_rate=5e-4, lambda_i=1e-3, lambda_j=1e-3)
+                logFile=logFile, batch_size=1, sgd_mode='adagrad', learning_rate=5e-4, lambda_i=1e-4, lambda_j=1e-4, topK=500)
         # ev.print_worst(ds)
 
 

@@ -7,6 +7,7 @@ import pandas as pd
 # Cluster stuff
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import normalize
+from sklearn.feature_extraction.text import TfidfTransformer
 
 
 class Dataset():
@@ -189,12 +190,15 @@ class Dataset():
                 for track in tracks:
                     # get index
                     tr_index = self.get_track_index_from_id(track)
-                    iucm[created_at_index, tr_index] += self.created_at_weight
-                    iucm[owner_index, tr_index] += self.owner_weight
+                    iucm[created_at_index, tr_index] += 1  # self.created_at_weight
+                    iucm[owner_index, tr_index] += 1  # self.owner_weight
                     for title_index in title_index_array:
-                        iucm[title_index, tr_index] += self.title_weight
-            index += 1
-        iucm = normalize(iucm, axis=0) * 0.05
+                        iucm[title_index, tr_index] += 1  # self.title_weight
+        # apply tfidf
+        tfidftransform = TfidfTransformer()
+        icm = tfidftransform.fit_transform(iucm.transpose()).transpose()
+        # scale all values
+        iucm = iucm * 0.005
         return iucm
 
     def build_train_matrix(self, filename='csr_urm.npz'):
@@ -338,11 +342,13 @@ def build_tracks_mappers(path, dataset, load_tags=False, filter_tag=False):
                         min_duration = duration
                     if duration > max_duration:
                         max_duration = duration
-                    durations.append(duration)
+                    # durations.append(duration)
+                    # take the log
+                    durations.append(np.log(duration))
             if row['playcount'] is not None and row['playcount'] != '':
                 playcount = float(row['playcount'])
                 # threshold for max
-                playcounts.append(playcount)
+                playcounts.append(np.log(playcount))
                 if playcount < 5000:
                     if playcount < min_playcount:
                         min_playcount = playcount

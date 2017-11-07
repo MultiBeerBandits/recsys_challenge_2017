@@ -36,7 +36,9 @@ class ContentBasedFiltering(object):
         S = None
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
+        icm = dataset.build_icm()
+        # icm = self.applytfidf(icm)
+        icm = dataset.add_playlist_to_icm(icm, urm, 0.5)
         # icm = dataset.add_playlist_attr_to_icm(icm, test_dict)
         # icm = get_icm_weighted_chi2(urm, dataset.build_icm())
         print("SHAPE of ICM: ", icm.shape)
@@ -55,8 +57,8 @@ class ContentBasedFiltering(object):
         icm = icm.multiply(csr_matrix(np.reciprocal(norm)))
         icm_t = icm.transpose()
         # clean the transposed matrix, we do not need tracks not target
-        icm_t = icm_t[[dataset.get_track_index_from_id(x)
-                       for x in self.tr_id_list]]
+        # icm_t = icm_t[[dataset.get_track_index_from_id(x)
+                       # for x in self.tr_id_list]]
         icm_ones = icm.copy()
         icm_ones[icm_ones.nonzero()] = 1
         chunksize = 1000
@@ -72,13 +74,13 @@ class ContentBasedFiltering(object):
             S_prime = icm_t[chunk:end].tocsr().dot(icm)
             print("S_prime prime built.")
             # compute common features
-            icm_t_ones = icm_t[chunk:end]
-            icm_t_ones[icm_t_ones.nonzero()] = 1
-            S_num = icm_t_ones.dot(icm_ones)
-            S_den = S_num.copy()
-            S_den.data += shrinkage
-            S_den.data = np.reciprocal(S_den.data)
-            S_prime = S_prime.multiply(S_num).multiply(S_den)
+            # icm_t_ones = icm_t[chunk:end]
+            # icm_t_ones[icm_t_ones.nonzero()] = 1
+            # S_num = icm_t_ones.dot(icm_ones)
+            # S_den = S_num.copy()
+            # S_den.data += shrinkage
+            # S_den.data = np.reciprocal(S_den.data)
+            # S_prime = S_prime.multiply(S_num).multiply(S_den)
             print("S_prime applied shrinkage")
             # Top-K filtering.
             # We only keep the top K similarity weights to avoid considering many
@@ -96,6 +98,7 @@ class ContentBasedFiltering(object):
             else:
                 # stack matrices vertically
                 S = vstack([S, S_prime], format="csr")
+        # Here S is IxI
         print("Similarity matrix ready, let's normalize it!")
         # zero out diagonal
         # in the diagonal there is the sim between i and i (1)
@@ -111,6 +114,9 @@ class ContentBasedFiltering(object):
         self.S = S.transpose()
         # compute ratings
         R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
+        # eliminate useless columns
+        R_hat = R_hat[:, [dataset.get_track_index_from_id(x)
+                                      for x in self.tr_id_list]]
         print("R_hat done")
         # apply mask for eliminating already rated items
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
@@ -128,9 +134,7 @@ class ContentBasedFiltering(object):
         Returns the similary matrix with dimensions I x I
         S is IxT
         """
-        W = lil_matrix((self.S.shape[0],self.S.shape[0]))
-        W[:,[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]] = self.S
-        return W
+        return self.S.tocsr()
 
     def predict(self, at=5):
         """
@@ -149,6 +153,26 @@ class ContentBasedFiltering(object):
             tracks_ids = [self.tr_id_list[x] for x in track_cols]
             recs[pl_id] = tracks_ids
         return recs
+
+    def applytfidf(self, icm):
+        # first apply it to artists
+        # artists goes from 0 to alb-1
+        final_row_artist = np.amin(list(self.dataset.track_attr_mapper['album'].values()))-1
+        artist_icm = icm[0:final_row_artist]
+        artist_icm = csr_matrix(TfidfTransformer().fit_transform(artist_icm.transpose()).transpose())
+        final_row_album = np.amin(list(self.dataset.track_attr_mapper['tags'].values()))-1
+        album_icm = icm[final_row_artist+1:final_row_album]
+        album_icm = csr_matrix(TfidfTransformer().fit_transform(album_icm.transpose()).transpose())
+        final_row_tags = np.amax(list(self.dataset.track_attr_mapper['tags'].values()))
+        tag_icm = icm[final_row_album+1:final_row_tags]
+        tag_icm = csr_matrix(TfidfTransformer().fit_transform(tag_icm.transpose()).transpose()) * 0.1
+        icm_tfidf = csr_matrix(vstack([artist_icm, album_icm, tag_icm]))
+        print(icm_tfidf.shape)
+        print(icm.shape)
+        print(final_row_tags)
+        print("finished")
+        return csr_matrix(vstack([icm_tfidf,icm[final_row_tags+1:icm.shape[0]-1]]))
+
 
     def get_model(self):
         """
