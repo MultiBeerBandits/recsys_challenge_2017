@@ -13,7 +13,7 @@ def run_SLIM():
     ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
-    
+
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
     test_urm = ev.get_test_matrix(0, ds)
     recommender = SLIM_BPR_Cython(urm.tocsr(), ev=ev, dataset=ds, tg_tracks=tg_tracks, tg_playlist=tg_playlist, recompile_cython=True, positive_threshold=1, sparse_weights=True)
