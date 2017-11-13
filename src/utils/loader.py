@@ -563,8 +563,9 @@ def build_aggregated_feature_space(icm, n_features, topK):
     run TF-IDF rescaled to [0, 1].
     """
     from sklearn.feature_extraction.text import TfidfTransformer
-    aggregated_f = aggregate_features(icm, n_features, topK)
-    extended_icm = vstack((icm, aggregated_f), format='csr')
+    # agg_f_less = aggregate_features(icm, n_features - 1, topK)
+    agg_f_full = aggregate_features(icm, n_features, topK)
+    extended_icm = vstack((icm, agg_f_full), format='csr')
     print('Computing TF-IDF...')
     transformer = TfidfTransformer(norm='l2', use_idf=True,
                                    smooth_idf=True, sublinear_tf=False)

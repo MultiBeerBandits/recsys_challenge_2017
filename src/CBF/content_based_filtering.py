@@ -4,6 +4,8 @@ import numpy as np
 import numpy.linalg as la
 import scipy.sparse.linalg as sLA
 from src.utils.feature_weighting import *
+import implicit
+import src.utils.matrix_utils as utils
 
 
 class ContentBasedFiltering(object):
@@ -31,15 +33,32 @@ class ContentBasedFiltering(object):
 
         self.pl_id_list = list(target_playlist)
         self.tr_id_list = list(target_tracks)
-        S = None
         print("CBF started")
+        # Compute URM matrix factorization and predict missing ratings
+        print('Implicit matrix factorization on URM...')
+        ials = implicit.als.AlternatingLeastSquares(factors=10)
+        ials.fit(urm.transpose().multiply(40))
+        # Get latent factors
+        user_factors = ials.user_factors
+        item_factors = ials.item_factors
+        print('Estimating URM multiplying latent factors...')
+        urm_hat = utils.dot_chunked(user_factors,
+                                    item_factors.transpose(),
+                                    topK=500,
+                                    chunksize=1000)
+        urm_hat = lil_matrix(urm_hat)
+        urm_hat[urm.nonzero()] = 1
+        urm_hat = csr_matrix(urm_hat)
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.4)
+        icm = dataset.add_playlist_to_icm(dataset.build_icm(),
+                                          urm_hat,
+                                          0.25).tocsr()
         # Get tags feature matrix and build the aggregated weighted matrix
-        tags = dataset.build_tags_matrix()
-        tags = build_aggregated_feature_space(tags, n_features=3, topK=100)
+        # tags = dataset.build_tags_matrix()
+        # tags = build_aggregated_feature_space(tags, n_features=3, topK=10)
+        # tags = tags.multiply(0.5)  # Weight tags
         # Stack the ICM on top of aggregated weighted tags features
-        icm = vstack((icm, tags))
+        # icm = vstack((icm, tags))
         print("SHAPE of ICM: ", icm.shape)
         # apply tfidf
         # transformer = TfidfTransformer()
@@ -48,55 +67,15 @@ class ContentBasedFiltering(object):
         # S_ij=(sum for k belonging to attributes t_ik*t_jk)/norm_i * norm_k
         # first calculate norm
         # sum over rows (obtaining a row vector)
-        print("Calculating norm")
-        norm = sLA.norm(icm, axis=0)
-        print("Calculated norm")
-        norm[(norm == 0)] = 1
-        # normalize
-        icm = icm.multiply(csr_matrix(np.reciprocal(norm)))
-        icm_t = icm.transpose()
-        # clean the transposed matrix, we do not need tracks not target
-        icm_t = icm_t[[dataset.get_track_index_from_id(x)
-                       for x in self.tr_id_list]]
-        icm_ones = icm.copy()
-        icm_ones[icm_ones.nonzero()] = 1
-        chunksize = 1000
-        mat_len = icm_t.shape[0]
-        for chunk in range(0, mat_len, chunksize):
-            if chunk + chunksize > mat_len:
-                end = mat_len
-            else:
-                end = chunk + chunksize
-            print(('Building cosine similarity matrix for [' +
-                   str(chunk) + ', ' + str(end) + ') ...'))
-            # First compute similarity
-            S_prime = icm_t[chunk:end].tocsr().dot(icm)
-            print("S_prime prime built.")
-            # compute common features
-            icm_t_ones = icm_t[chunk:end]
-            icm_t_ones[icm_t_ones.nonzero()] = 1
-            S_num = icm_t_ones.dot(icm_ones)
-            S_den = S_num.copy()
-            S_den.data += shrinkage
-            S_den.data = np.reciprocal(S_den.data)
-            S_prime = S_prime.multiply(S_num).multiply(S_den)
-            print("S_prime applied shrinkage")
-            # Top-K filtering.
-            # We only keep the top K similarity weights to avoid considering many
-            # barely-relevant neighbors
-            for row_i in range(0, S_prime.shape[0]):
-                row = S_prime.data[S_prime.indptr[row_i]:S_prime.indptr[row_i + 1]]
 
-                sorted_idx = row.argsort()[:-k_filtering]
-                row[sorted_idx] = 0
-
-            print("S_prime filtered")
-            S_prime.eliminate_zeros()
-            if S is None:
-                S = S_prime
-            else:
-                # stack matrices vertically
-                S = vstack([S, S_prime], format="csr")
+        # Compute cosine similarity matrix on ICM
+        icm_t = icm.transpose()[[dataset.get_track_index_from_id(x)
+                                 for x in self.tr_id_list]]
+        # S is a (n_target_tracks, n_tracks)
+        S = utils.compute_cosine(icm_t,
+                                 icm,
+                                 k_filtering=k_filtering,
+                                 shrinkage=shrinkage)
         print("Similarity matrix ready, let's normalize it!")
         # zero out diagonal
         # in the diagonal there is the sim between i and i (1)
