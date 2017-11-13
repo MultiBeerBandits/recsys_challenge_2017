@@ -35,7 +35,7 @@ class IALS():
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         # initialize a model
-        self.model = implicit.als.AlternatingLeastSquares(factors=self.features, iterations=self.learning_steps)
+        self.model = implicit.als.AlternatingLeastSquares(factors=self.features, regularization=self.reg, iterations=self.learning_steps, calculate_training_loss=True)
 
         # train the model on a sparse matrix of item/user/confidence weights
         self.model.fit(self.urm.transpose().multiply(self.confidence))
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        ials = IALS(urm, 500, 100, 1e-6, 40)
+        ials = IALS(urm, 100, 50, 1e-6, 40)
         ials.fit(list(tg_playlist), list(tg_tracks), ds)
         recs = ials.predict(list(tg_playlist), list(tg_tracks), ds)
         ev.evaluate_fold(recs)

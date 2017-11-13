@@ -14,10 +14,10 @@ class WARP():
         self.tr_id_list = None
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=200, item_alpha=1e-5, l_rate=5e-2):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=300, n_epochs=30, item_alpha=1e-8, l_rate=0.2):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
-        model = LightFM(loss='warp', learning_rate=l_rate, random_state=2016, no_components=no_components, item_alpha=item_alpha, max_sampled=100)
+        model = LightFM(loss='bpr', learning_rate=l_rate, random_state=2016, no_components=no_components, item_alpha=item_alpha, max_sampled=100, user_alpha=item_alpha)
         # Initialize model.
         # Need an identity matrix stacked horizontaly
         # Unknown reason, refer to:
@@ -26,12 +26,17 @@ class WARP():
         icm = dataset.build_icm().tocsr()
         icm_t = hstack((id_item, icm.transpose())).tocsr().astype(np.float32)
 
+        id_playlist = eye(urm.shape[0], urm.shape[0]).tocsr()
+        ucm = dataset.build_ucm().tocsr()
+        ucm_t = hstack((id_playlist, ucm.transpose())).tocsr().astype(np.float32)
+
         # iterarray = range(10, 110, 10)
 
         # patk_learning_curve(model, urm, test_urm, urm, iterarray, item_features=icm.transpose(), **{'num_threads': 4})
 
         model.fit_partial(urm,
                           item_features=icm_t,
+                          user_features=ucm_t,
                           epochs=n_epochs, verbose=True, **{'num_threads': 4})
         print("Training finished")
 
@@ -43,7 +48,7 @@ class WARP():
         for u_id in tg_playlist:
             u_index = dataset.get_playlist_index_from_id(u_id)
             R_hat[cont] = model.predict(
-                u_index, tr_indices, item_features=icm_t, num_threads=4)
+                u_index, tr_indices, item_features=icm_t, user_features=ucm_t, num_threads=4)
             if cont % 1000 == 0:
                 print("Done: ", cont)
             cont += 1

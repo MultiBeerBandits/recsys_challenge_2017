@@ -147,7 +147,8 @@ class Evaluator(object):
         (Worst according to MAP@5)
         """
         # this should return a list of tuples ordered by map
-        sorted_list = sorted(self.map_playlists.items(), key=lambda x: x[1])
+        # reverse
+        sorted_list = sorted(self.map_playlists.items(), key=lambda x: x[1])[::-1]
         # print the first 10 elements
         for i in range(0, 10):
             pl_id = sorted_list[i][0]

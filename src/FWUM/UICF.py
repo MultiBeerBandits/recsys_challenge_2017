@@ -38,7 +38,7 @@ class xSquared():
         self.dataset = None
         self.R_hat = None
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, k_feature=1000, k_similar=500):
+    def fit(self, urm, target_playlist, target_tracks, dataset, k_feature=1000, k_similar=1000):
         # initialization
         self.pl_id_list = list(target_playlist)
         self.tr_id_list = list(target_tracks)

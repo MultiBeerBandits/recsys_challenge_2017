@@ -190,16 +190,49 @@ class Dataset():
                 for track in tracks:
                     # get index
                     tr_index = self.get_track_index_from_id(track)
-                    iucm[created_at_index, tr_index] += 1  # self.created_at_weight
-                    iucm[owner_index, tr_index] += 1  # self.owner_weight
+                    iucm[created_at_index, tr_index] += self.created_at_weight
+                    iucm[owner_index, tr_index] += self.owner_weight
                     for title_index in title_index_array:
-                        iucm[title_index, tr_index] += 1  # self.title_weight
+                        iucm[title_index, tr_index] += self.title_weight
         # apply tfidf
-        tfidftransform = TfidfTransformer()
-        icm = tfidftransform.fit_transform(iucm.transpose()).transpose()
+        # tfidftransform = TfidfTransformer()
+        # icm = tfidftransform.fit_transform(iucm.transpose()).transpose()
         # scale all values
-        iucm = iucm * 0.005
         return iucm
+
+    def build_ucm(self, path='./data/playlists_final'):
+        ucm = lil_matrix((self.playlist_attrs_number, self.playlists_number))
+        # for each playlist get its tracks and add its attributes
+        # tracks of a playlist are the indices of urm
+        # keep track of the index for cluster of created at
+        index = 0
+        for pl_id in self.playlists_final.keys():
+            # check, some playlists are not in the training set
+            if pl_id in self.train_final.keys():
+                # get attributes of the playlist
+                # get created at
+                created_at_offset = self.created_at_cluster[index]
+                created_at_index = self.playlist_attr_mapper['created_at'] + \
+                    created_at_offset
+                # get owner
+                owner = self.playlists_final[pl_id]['owner']
+                owner_index = self.playlist_attr_mapper['owner'][owner]
+                # get title
+                title = self.playlists_final[pl_id]['title']
+                # array of word of the title
+                title_array = parse_csv_array(title)
+                title_index_array = [
+                    self.playlist_attr_mapper['title'][x] for x in title_array]
+                pl_index = self.get_playlist_index_from_id(pl_id)
+                ucm[created_at_index, pl_index] += self.created_at_weight
+                ucm[owner_index, pl_index] += self.owner_weight
+                for title_index in title_index_array:
+                    ucm[title_index, pl_index] += self.title_weight
+        # apply tfidf
+        # tfidftransform = TfidfTransformer()
+        # icm = tfidftransform.fit_transform(iucm.transpose()).transpose()
+        # scale all values
+        return ucm
 
     def build_train_matrix(self, filename='csr_urm.npz'):
         """
