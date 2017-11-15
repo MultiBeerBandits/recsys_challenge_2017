@@ -80,6 +80,9 @@ cdef class SLIM_BPR_Cython_Epoch:
         self.URM_mask_indices = URM_mask.indices
         self.URM_mask_indptr = URM_mask.indptr
 
+        self.S_indices = S.transpose().indices
+        self.S_indptr = S.transpose().indptr
+
         if self.sparse_weights:
 
             self.S_sparse = Sparse_Matrix_Tree_CSR(self.n_items, self.n_items)
@@ -214,11 +217,11 @@ cdef class SLIM_BPR_Cython_Epoch:
                     # Here we sum to the gradient lambda_i * s_i,seenItem 
                     if seenItem != i:
                         reg_i_seenItem = self.lambda_i * self.S_sparse.get_value(i, seenItem)
-                        self.S_sparse.add_value(i, seenItem, self.learning_rate * (gradient + reg_i_seenItem), False)
+                        self.S_sparse.add_value(i, seenItem, self.learning_rate * (gradient + reg_i_seenItem))
                     # Here we sum to the gradient lambda_j * s_j,seenItem 
                     if seenItem != j:
                         reg_j_seenItem = self.lambda_j * self.S_sparse.get_value(j, seenItem)
-                        self.S_sparse.add_value(j, seenItem, self.learning_rate * (-gradient + reg_j_seenItem), False)
+                        self.S_sparse.add_value(j, seenItem, self.learning_rate * (-gradient + reg_j_seenItem))
 
                 else:
 
@@ -285,7 +288,7 @@ cdef class SLIM_BPR_Cython_Epoch:
             row = S.data[S.indptr[r]:S.indptr[r+1]]
             columns = S.indices[S.indptr[r]:S.indptr[r+1]]
             for i in range(row.shape[0]):
-                self.S_sparse.add_value(r, columns[i], row[i], True)
+                self.S_sparse.add_value(r, columns[i], row[i])
         # rebalance the tree
         self.S_sparse.rebalance_tree()    
 
@@ -443,7 +446,7 @@ cdef class Sparse_Matrix_Tree_CSR:
             self.row_pointer[index].head = NULL
 
 
-    cpdef double add_value(self, long row, long col, double value, bint create):
+    cpdef double add_value(self, long row, long col, double value):
         """
         The function adds a value to the specified cell. A new cell is created if necessary.         
         
@@ -452,63 +455,63 @@ cdef class Sparse_Matrix_Tree_CSR:
         :param value: value to add
         :return double: resulting cell value
         """
+        if row in self.S_indptr and col in self.S_indices[self.S_indptr[row]: self.S_indptr[row+1]]:
 
-        if row >= self.num_rows or col >= self.num_cols or row < 0 or col < 0:
-            raise ValueError("Cell is outside matrix. Matrix shape is ({},{}), coordinates given are ({},{})".format(
-                self.num_rows, self.num_cols, row, col))
+            if row >= self.num_rows or col >= self.num_cols or row < 0 or col < 0:
+                raise ValueError("Cell is outside matrix. Matrix shape is ({},{}), coordinates given are ({},{})".format(
+                    self.num_rows, self.num_cols, row, col))
 
-        cdef matrix_element_tree_s* current_element, new_element, * old_element
-        cdef int stopSearch = False
+            cdef matrix_element_tree_s* current_element, new_element, * old_element
+            cdef int stopSearch = False
 
 
-        # If the row is empty, create a new element
-        if self.row_pointer[row].head == NULL:
-            if create:
+            # If the row is empty, create a new element
+            if self.row_pointer[row].head == NULL:
+                
+                print("Creating")
                 # row_pointer is a python object, so I need the object itself and not the address
                 self.row_pointer[row].head = pointer_new_matrix_element_tree_s(col, value, NULL, NULL)
 
-            return value
+                return value
 
 
-        # If the row is not empty, look for the cell
-        # row_pointer contains the struct itself, but I just want its address
-        current_element = self.row_pointer[row].head
+            # If the row is not empty, look for the cell
+            # row_pointer contains the struct itself, but I just want its address
+            current_element = self.row_pointer[row].head
 
-        # Follow the tree structure
-        while not stopSearch:
+            # Follow the tree structure
+            while not stopSearch:
 
-            if current_element.column < col and current_element.higher != NULL:
-                current_element = current_element.higher
+                if current_element.column < col and current_element.higher != NULL:
+                    current_element = current_element.higher
 
-            elif current_element.column > col and current_element.lower != NULL:
-                current_element = current_element.lower
+                elif current_element.column > col and current_element.lower != NULL:
+                    current_element = current_element.lower
 
-            else:
-                stopSearch = True
+                else:
+                    stopSearch = True
 
-        # If the cell exist, update its value
-        if current_element.column == col:
-            current_element.data += value
+            # If the cell exist, update its value
+            if current_element.column == col:
+                current_element.data += value
 
-            return current_element.data
+                return current_element.data
 
 
-        # The cell is not found, create new Higher element
-        elif current_element.column < col and current_element.higher == NULL:
-            if create:
+            # The cell is not found, create new Higher element
+            elif current_element.column < col and current_element.higher == NULL:
                 current_element.higher = pointer_new_matrix_element_tree_s(col, value, NULL, NULL)
 
-            return value
+                return value
 
-        # The cell is not found, create new Lower element
-        elif current_element.column > col and current_element.lower == NULL:
-            if create:
+            # The cell is not found, create new Lower element
+            elif current_element.column > col and current_element.lower == NULL:
                 current_element.lower = pointer_new_matrix_element_tree_s(col, value, NULL, NULL)
 
-            return value
+                return value
 
-        else:
-            assert False, 'ERROR - Current insert operation is not implemented'
+            else:
+                assert False, 'ERROR - Current insert operation is not implemented'
 
 
 

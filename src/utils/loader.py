@@ -303,8 +303,9 @@ class Dataset():
         owner_item = owners.dot(urm)
         for playlist_index in range(urm.shape[0]):
             owner_index = owners.indices[owners.indptr[playlist_index]:owners.indptr[playlist_index+1]]
-            print("This should be 1!", owner_index.shape)
-            owner_item_matrix[playlist_index] = owner_item[owner_index[0]]
+            # print("This should be 1!", owner_index.shape)
+            if owner_index.shape[0]==1:
+                owner_item_matrix[playlist_index] = owner_item[owner_index[0]]
         print("OIM shape:", owner_item_matrix.shape)
         return owner_item_matrix.tocsr()
 
