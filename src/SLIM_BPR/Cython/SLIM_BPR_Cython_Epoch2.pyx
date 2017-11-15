@@ -455,14 +455,13 @@ cdef class Sparse_Matrix_Tree_CSR:
         :param value: value to add
         :return double: resulting cell value
         """
+        cdef matrix_element_tree_s* current_element, new_element, * old_element
+        cdef int stopSearch = False
         if row in self.S_indptr and col in self.S_indices[self.S_indptr[row]: self.S_indptr[row+1]]:
 
             if row >= self.num_rows or col >= self.num_cols or row < 0 or col < 0:
                 raise ValueError("Cell is outside matrix. Matrix shape is ({},{}), coordinates given are ({},{})".format(
                     self.num_rows, self.num_cols, row, col))
-
-            cdef matrix_element_tree_s* current_element, new_element, * old_element
-            cdef int stopSearch = False
 
 
             # If the row is empty, create a new element
