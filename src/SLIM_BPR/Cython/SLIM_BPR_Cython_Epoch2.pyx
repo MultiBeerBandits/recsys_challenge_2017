@@ -443,7 +443,7 @@ cdef class Sparse_Matrix_Tree_CSR:
             self.row_pointer[index].head = NULL
 
 
-    cpdef double add_value(self, long row, long col, double value, bool create):
+    cpdef double add_value(self, long row, long col, double value, bint create):
         """
         The function adds a value to the specified cell. A new cell is created if necessary.         
         
