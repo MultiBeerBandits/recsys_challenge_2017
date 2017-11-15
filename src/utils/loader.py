@@ -269,9 +269,25 @@ class Dataset():
         """
         Returns the artist part of icm
         """
-        start_artist = np.amin(list(self.track_attr_mapper['artist'].values()))
-        final_artist = np.amax(list(self.track_attr_mapper['artist'].values()))+1
+        start_artist = np.amin(list(self.track_attr_mapper['artist_id'].values()))
+        final_artist = np.amax(list(self.track_attr_mapper['artist_id'].values()))+1
         return icm[start_artist:final_artist, :]
+
+    def build_duration_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start = self.track_attr_mapper['duration']
+        end = start + self.duration_intervals
+        return icm[start:end, :]
+
+    def build_playcount_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start = self.track_attr_mapper['playcount']
+        end = start + self.playcount_intervals
+        return icm[start:end, :]
 
     def build_album_matrix(self, icm):
         """
@@ -298,14 +314,16 @@ class Dataset():
         return icm[start:end, :]
 
     def build_owner_item_matrix(self, ucm, urm):
-        owner_item_matrix = lil_matrix((urm.shape[0], urm.shape[1]))
         owners = self.build_owner_matrix(ucm).tocsc()
         owner_item = owners.dot(urm)
-        for playlist_index in range(urm.shape[0]):
-            owner_index = owners.indices[owners.indptr[playlist_index]:owners.indptr[playlist_index+1]]
-            # print("This should be 1!", owner_index.shape)
-            if owner_index.shape[0]==1:
-                owner_item_matrix[playlist_index] = owner_item[owner_index[0]]
+        # for playlist_index in range(urm.shape[0]):
+        #     owner_index = owners.indices[owners.indptr[playlist_index]:owners.indptr[playlist_index+1]]
+        #     # print("This should be 1!", owner_index.shape)
+        #     if owner_index.shape[0]==1:
+        #         owner_item_matrix[playlist_index] = owner_item[owner_index[0]]
+        # this is a playlist playlist sim
+        pl_owner_sim = owners.transpose().dot(owners)
+        owner_item_matrix = pl_owner_sim.dot(urm)
         print("OIM shape:", owner_item_matrix.shape)
         return owner_item_matrix.tocsr()
 
@@ -323,6 +341,22 @@ class Dataset():
         """
         start = self.playlist_attr_mapper['created_at']
         end = start + self.created_at_intervals
+        return icm[start:end, :]
+
+    def build_numtracks_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start = self.playlist_attr_mapper['numtracks']
+        end = start + self.playlist_numtracks_intervals
+        return icm[start:end, :]
+
+    def build_pl_duration_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start = self.playlist_attr_mapper['duration']
+        end = start + self.playlist_duration_intervals
         return icm[start:end, :]
 
 
