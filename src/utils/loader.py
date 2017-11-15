@@ -29,6 +29,8 @@ class Dataset():
         self.pop_threshold = 5
         # for created_at of playlists
         self.created_at_intervals = 30
+        self.playlist_duration_intervals = 30
+        self.playlist_numtracks_intervals = 30
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}
@@ -74,6 +76,8 @@ class Dataset():
         self.created_at_weight = 1
         self.owner_weight = 1
         self.title_weight = 1
+        self.playlist_duration_weight = 1
+        self.playlist_numtracks_weight = 1
 
     def set_track_attr_weights(self, art_w, alb_w, dur_w, playcount_w, tags_w):
         self.artist_weight = art_w
@@ -82,10 +86,12 @@ class Dataset():
         self.playcount_weight = playcount_w
         self.tags_weight = tags_w
 
-    def set_playlist_attr_weights(self, created_at_weight, owner_weight, title_weight):
+    def set_playlist_attr_weights(self, created_at_weight, owner_weight, title_weight, duration_weight, numtracks_weight):
         self.created_at_weight = created_at_weight
         self.owner_weight = owner_weight
         self.title_weight = title_weight
+        self.playlist_duration_weight = duration_weight
+        self.playlist_numtracks_weight = numtracks_weight
 
     def build_icm(self, path='./data/tracks_final.csv'):
         """
@@ -151,7 +157,7 @@ class Dataset():
                     playcount_index += 1
         return icm
 
-<<<<<<< HEAD
+
     def build_iucm(self, test_dict, path='./data/playlists_final'):
         """
         test_dict is a dict like {pl_id : [tracks]}
@@ -215,6 +221,10 @@ class Dataset():
                 created_at_offset = self.created_at_cluster[index]
                 created_at_index = self.playlist_attr_mapper['created_at'] + \
                     created_at_offset
+                duration_offset = self.playlist_duration_cluster[index]
+                duration_index = self.playlist_attr_mapper['duration'] + duration_offset
+                numtracks_offset = self.playlist_numtracks_cluster[index]
+                numtracks_index = self.playlist_attr_mapper['numtracks'] + numtracks_offset
                 # get owner
                 owner = self.playlists_final[pl_id]['owner']
                 owner_index = self.playlist_attr_mapper['owner'][owner]
@@ -225,10 +235,12 @@ class Dataset():
                 title_index_array = [
                     self.playlist_attr_mapper['title'][x] for x in title_array]
                 pl_index = self.get_playlist_index_from_id(pl_id)
-                ucm[created_at_index, pl_index] += self.created_at_weight
-                ucm[owner_index, pl_index] += self.owner_weight
+                ucm[created_at_index, pl_index] = self.created_at_weight
+                ucm[duration_index, pl_index] = self.playlist_duration_weight
+                ucm[numtracks_index, pl_index] = self.playlist_numtracks_weight
+                ucm[owner_index, pl_index] = self.owner_weight
                 for title_index in title_index_array:
-                    ucm[title_index, pl_index] += self.title_weight
+                    ucm[title_index, pl_index] = self.title_weight
         # apply tfidf
         # tfidftransform = TfidfTransformer()
         # icm = tfidftransform.fit_transform(iucm.transpose()).transpose()
@@ -252,6 +264,55 @@ class Dataset():
                         tag_index = self.track_attr_mapper['tags'][tag]
                         tags_matrix[tag_index, track_index] = 1
         return tags_matrix
+
+    def build_artist_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start_artist = np.amin(list(self.track_attr_mapper['artist'].values()))
+        final_artist = np.amax(list(self.track_attr_mapper['artist'].values()))+1
+        return icm[start_artist:final_artist, :]
+
+    def build_album_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start_album = np.amin(list(self.track_attr_mapper['album'].values()))
+        final_album = np.amax(list(self.track_attr_mapper['album'].values()))+1
+        return icm[start_album:final_album, :]
+
+    def build_tag_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start_tag = np.amin(list(self.track_attr_mapper['tags'].values()))
+        end_tag = np.amax(list(self.track_attr_mapper['tags'].values()))+1
+        return icm[start_tag:end_tag, :]
+
+    def build_owner_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start = np.amin(list(self.playlist_attr_mapper['owner'].values()))
+        end = np.amax(list(self.playlist_attr_mapper['owner'].values()))+1
+        return icm[start:end, :]
+
+    def build_title_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start = np.amin(list(self.playlist_attr_mapper['title'].values()))
+        end = np.amax(list(self.playlist_attr_mapper['title'].values()))+1
+        return icm[start:end, :] 
+
+    def build_created_at_matrix(self, icm):
+        """
+        Returns the artist part of icm
+        """
+        start = self.playlist_attr_mapper['created_at']
+        end = start + self.created_at_intervals
+        return icm[start:end, :]
+
 
     def build_train_matrix(self, filename='csr_urm.npz'):
         """
@@ -309,7 +370,7 @@ class Dataset():
     def add_playlist_to_icm(self, icm, urm, urm_weight):
         # for each track add the playlist attribute
         urm_weighted = urm * urm_weight
-        return vstack([icm, urm_weighted])
+        return vstack([icm, urm_weighted], format='csr')
 
     def add_playlist_attr_to_icm(self, icm, test_dict):
         """
@@ -548,13 +609,15 @@ def build_playlists_mappers(path, dataset):
     """
     Builds the mapper for playlist
     """
-    attrs = {'title': set(), 'owner': set(), 'created_at': 0}
+    attrs = {'title': set(), 'owner': set(), 'created_at': 0, 'numtracks':0, 'duration':0}
     # mapper from playlist id to row index
     playlist_id_mapper = {}
     # mapper from row index to playlist id
     playlists_index_mapper = {}
     # array of creation time for dividing it into cluster
     created_at = []
+    numtracks = []
+    duration = []
     playlist_index = 0
     with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file, delimiter='\t')
@@ -565,6 +628,8 @@ def build_playlists_mappers(path, dataset):
             owner = row['owner']
             attrs['owner'].add(owner)
             created_at.append(row['created_at'])
+            numtracks.append(row['numtracks'])
+            duration.append(row['duration'])
             playlist_id_mapper[row['playlist_id']] = playlist_index
             playlists_index_mapper[playlist_index] = row['playlist_id']
             playlist_index += 1
@@ -577,9 +642,15 @@ def build_playlists_mappers(path, dataset):
         mapper['owner'][v] = attr_index
         attr_index += 1
     mapper['created_at'] = attr_index
-    attr_index += dataset.created_at_intervals + 1
+    mapper['duration'] = attr_index + dataset.created_at_intervals
+    mapper['numtracks'] = attr_index + dataset.created_at_intervals + dataset.playlist_duration_intervals
+    attr_index += dataset.created_at_intervals + dataset.playlist_duration_intervals + dataset.playlist_numtracks_intervals + 1
     dataset.created_at_cluster = KMeans(
         n_clusters=dataset.created_at_intervals).fit_predict(np.reshape(created_at, (-1, 1)))
+    dataset.playlist_numtracks_cluster = KMeans(
+        n_clusters=dataset.playlist_numtracks_intervals).fit_predict(np.reshape(numtracks, (-1, 1)))
+    dataset.playlist_duration_cluster = KMeans(
+        n_clusters=dataset.playlist_duration_intervals).fit_predict(np.reshape(duration, (-1, 1)))
     return playlist_id_mapper, playlists_index_mapper, mapper, attr_index
 
 

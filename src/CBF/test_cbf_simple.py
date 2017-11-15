@@ -2,7 +2,7 @@ from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
 import numpy as np
-from src.CBF.content_based_filtering import *
+from src.CBF.CBF_tfidf import *
 from itertools import product
 
 
@@ -13,8 +13,8 @@ def main():
     # shr_w = 100
     # k_f = 50
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
-    ds.set_playlist_attr_weights(0.2, 0.2, 0.2)
+    ds.set_track_attr_weights(1, 0.9, 0.2, 0.2, 0.2)
+    ds.set_playlist_attr_weights(0.5, 0.7, 0.7, 0.4, 0.4)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()

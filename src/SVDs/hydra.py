@@ -3,10 +3,9 @@ from scipy.sparse import *
 import numpy as np
 import numpy.linalg as la
 import scipy.sparse.linalg as sLA
-from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
-from sklearn.metrics.pairwise import pairwise_distances
-from src.utils.matrix_utils import compute_cosine, top_k_filtering
+import src.utils.matrix_utils as utils
+from sparsesvd import sparsesvd
 from src.utils.evaluator import *
 
 
@@ -21,7 +20,7 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200, test_dict={}, content_penalty=10):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200, features=100):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -37,58 +36,51 @@ class ContentBasedFiltering(object):
         self.tr_id_list = list(target_tracks)
         self.dataset = dataset
         print("CBF started")
-        # get ICM from dataset, assume it already cleaned
-        icm = csr_matrix(dataset.build_icm())
-        i_sim = compute_cosine(icm.transpose(), icm, k_filtering=200, shrinkage=shrinkage)
-        i_sim_norm = i_sim.sum(axis=1)
-        # normalize
-        i_sim = i_sim.multiply(np.reciprocal(i_sim_norm))
-        # compute augmented urm
-        aUrm = urm.dot(i_sim.transpose())
-        # scale pseudo rating of each user:
-        # Rationale: more rating -> more correct Content Based
-        # Multiply rating of u: #u / (#u + H)
-        rating_number = urm.sum(axis=1)
-        rating_den = rating_number + content_penalty
-        scaling = np.multiply(rating_number, np.reciprocal(rating_den))
-        aUrm = csr_matrix(aUrm.multiply(scaling))
-        print("Augmented URM ready!")
-        # restore original ratings
-        aUrm[urm.nonzero()] = 1
-        aUrm = top_k_filtering(aUrm, topK=500)
-        # do collaborative filtering on aUrm
-        # start with user feature matrix
-        ufm = urm.dot(icm.transpose())
-        # Iu contains for each user the number of tracks rated
-        Iu = urm.sum(axis=1)
-        # save from divide by zero!
-        Iu[Iu == 0] = 1
-        # Add a term for shrink
-        Iu = Iu + 10
-        # since we have to divide the ufm get the reciprocal of this vector
-        Iu = np.reciprocal(Iu)
-        # multiply the ufm by Iu. Normalize UFM
-        ufm = csr_matrix(ufm.multiply(Iu))
-        ufm = top_k_filtering(ufm, topK=1000)
-        ucm = csr_matrix(dataset.build_ucm())
-        # UCM is user x features
-        ucm = vstack([ucm, aUrm.transpose(), ufm.multiply(0.2)], format='csr').transpose()
-        # compute sim only for target users, u_sim is tg_user x users
-        u_sim = compute_cosine(ucm[[dataset.get_playlist_index_from_id(x)
-                                for x in self.pl_id_list]], ucm.transpose())
-        u_sim_norm = u_sim.sum(axis=1)
-        # normalize
-        u_sim = u_sim.multiply(np.reciprocal(u_sim_norm))
-        R_hat = u_sim.dot(aUrm[:, [dataset.get_track_index_from_id(x)
-                                   for x in self.tr_id_list]])
-        urm_red = urm[[dataset.get_playlist_index_from_id(x)
-                       for x in self.pl_id_list]]
-        urm_red = urm_red[:, [dataset.get_track_index_from_id(x)
-                              for x in self.tr_id_list]]
-        R_hat[urm_red.nonzero()] = 0
-        R_hat.eliminate_zeros()
-
+        # Compute URM matrix factorization and predict missing ratings
+        print('SVD on eURM')
+        icm = dataset.build_icm()
+        ucm = dataset.build_ucm().transpose() # ucm is playlist x attributes
+        zeros_matrix = lil_matrix((icm.shape[0], ucm.shape[1])).tocsr()
+        left_part = vstack([urm.multiply(0.5), icm], format='csr')
+        # Stack all matrices:
+        right_part = vstack([ucm, zeros_matrix], format='csr')
+        eURM = hstack([left_part, right_part], format='csr')
+        # DO SVD!
+        u, s, v = sparsesvd(eURM.tocsc(), features)
+        print("SHAPE of V: ", v.shape)
+        print("SHAPE OF U", u.shape)
+        # get only the features of the items
+        v = csr_matrix(v[:, 0:icm.shape[1]])
+        # get only the item part and compute cosine
+        S = utils.compute_cosine(v.transpose()[[dataset.get_track_index_from_id(x)
+                                      for x in self.tr_id_list]],
+                                 v,
+                                 k_filtering=k_filtering,
+                                 shrinkage=shrinkage)
+        print("Similarity matrix ready, let's normalize it!")
+        # zero out diagonal
+        # in the diagonal there is the sim between i and i (1)
+        # maybe it's better to have a lil matrix here
+        # S.setdiag(0)
+        # S.eliminate_zeros()
+        # keep only target rows of URM and target columns
+        urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
+                           for x in self.pl_id_list]]
+        s_norm = S.sum(axis=1)
+        # normalize s
+        S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+        self.S = S.transpose()
+        # compute ratings
+        R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
         print("R_hat done")
+        # apply mask for eliminating already rated items
+        urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
+                                      for x in self.tr_id_list]]
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat.eliminate_zeros()
+        # eliminate playlist that are not target, already done, to check
+        # R_hat = R_hat[:, [dataset.get_track_index_from_id(
+        #    x) for x in self.tr_id_list]]
         print("Shape of final matrix: ", R_hat.shape)
         self.R_hat = R_hat
 
@@ -97,9 +89,8 @@ class ContentBasedFiltering(object):
         Returns the similary matrix with dimensions I x I
         S is IxT
         """
-        W = lil_matrix((self.S.shape[0], self.S.shape[0]))
-        W[:, [self.dataset.get_track_index_from_id(
-            x) for x in self.tr_id_list]] = self.S
+        W = lil_matrix((self.S.shape[0],self.S.shape[0]))
+        W[:,[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]] = self.S
         return W
 
     def predict(self, at=5):
@@ -135,7 +126,7 @@ def main():
     # k_f = 50
     ds = Dataset(load_tags=True, filter_tag=True)
     ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
-    ds.set_playlist_attr_weights(0.2, 0.2, 0.2)
+    ds.set_playlist_attr_weights(0.3, 0.3, 0.3)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
@@ -144,7 +135,7 @@ def main():
         test_dict = ev.get_test_dict(i)
         cbf.fit(urm, tg_playlist,
                 tg_tracks,
-                ds, test_dict=test_dict)
+                ds)
         recs = cbf.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
@@ -175,4 +166,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

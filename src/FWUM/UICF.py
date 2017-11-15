@@ -5,6 +5,7 @@ import numpy as np
 import numpy.linalg as LA
 import scipy.sparse.linalg as sLA
 from sklearn.decomposition import TruncatedSVD
+from src.utils.matrix_utils import compute_cosine
 
 
 class xSquared():
@@ -49,7 +50,7 @@ class xSquared():
         print("Initial shape of icm ", self.icm.shape)
         # Apply SVD on ICM
         print("Shape of reduced icm: ", self.icm.shape)
-        self.urm = urm[[dataset.get_playlist_index_from_id(x) for x in target_playlist]]
+        self.urm = urm  # [[dataset.get_playlist_index_from_id(x) for x in target_playlist]]
         # CONTENT BASED USER PROFILE
         # build the user feature matrix
         self.ufm = self.urm.dot(self.icm.transpose())
@@ -59,14 +60,13 @@ class xSquared():
         # Iu contains for each user the number of tracks rated
         Iu = self.urm.sum(axis=1)
         # save from divide by zero!
-        Iu[Iu == 0] = 1
+        Iu = Iu + 10
         # since we have to divide the ufm get the reciprocal of this vector
         Iu = np.reciprocal(Iu)
-        print(Iu.shape)
         # multiply the ufm by Iu. Normalize UFM
         self.ufm = csr_matrix(self.ufm.multiply(Iu))
         # clean stuff
-        self.icm = self.icm[:, [dataset.get_track_index_from_id(x) for x in target_tracks]]
+        # self.icm = self.icm[:, [dataset.get_track_index_from_id(x) for x in target_tracks]]
         print("User feature matrix done")
 
         # Throw away useless feature
@@ -94,20 +94,7 @@ class xSquared():
         # NEIGHBOR FORMATION
         # normalize matrix
         print(self.ufm.shape)
-        norm = sLA.norm(self.ufm, axis=1)
-        norm[norm == 0] = 1
-        # convert norm to csr
-        # csr matrix builds a row vector. transpose it
-        norm = np.reciprocal(norm).transpose()
-        print("Normalizing")
-        self.ufm = self.ufm.multiply(csr_matrix(np.reshape(norm, (-1, 1))))
-        icm_norm = sLA.norm(self.icm, axis=0)
-        icm_norm[icm_norm == 0] = 1
-        icm_norm = np.reciprocal(icm_norm)
-        print("Normalizing icm")
-        icm_normalized = self.icm.multiply(csr_matrix(icm_norm))
-        S = self.ufm.dot(self.icm).todense()
-        # apply shrinkage factor:
+        S = compute_cosine(self.ufm, self.icm, k_filtering=500, shrinkage=10)
         # Let I_uv be the set of attributes in common of item i and j
         # Let H be the shrinkage factor
         #   Multiply element-wise for the matrix of I_uv (ie: the sim matrix)
@@ -122,18 +109,13 @@ class xSquared():
         # shr_den.data = np.reciprocal(shr_den.data)
         # S = S.multiply(shr_num)
         # S = csr_matrix(S.multiply(shr_den))
-        print("similarity done")
-        # eliminate non target users
-        # keep only top k similar user for each row
-        indices = np.argpartition(S, S.shape[1] - k_similar, axis=1)[:, :-k_similar] # keep all rows but until k columns
-        for i in range(S.shape[0]):
-            S[i, indices[i]] = 0
-        S = csr_matrix(S)
-        # normalize s
         # R_hat computation
         self.R_hat = S
+        # restore original ratings
+        #self.R_hat[self.urm.nonzero()] = 1
         # clean urm
         self.urm = self.urm[:, [dataset.get_track_index_from_id(x) for x in target_tracks]]
+        self.urm = self.urm[[dataset.get_playlist_index_from_id(x) for x in target_playlist]]
         # put to zero already rated elements
         self.R_hat[self.urm.nonzero()] = 0
         self.R_hat.eliminate_zeros()
@@ -227,8 +209,8 @@ class xSquared():
 
 
 if __name__ == '__main__':
-    ds = Dataset(load_tags=True, filter_tag=False)
-    ds.set_track_attr_weights(1, 1, 0.1, 0.1, 0.2)
+    ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights(1, 0.9, 0.2, 0.2, 0.2)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     xbf = xSquared()

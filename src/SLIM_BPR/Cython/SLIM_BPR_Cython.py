@@ -63,7 +63,7 @@ class SLIM_BPR_Cython(SLIM_BPR_Python):
     self.sgd_mode = sgd_mode
 
     # Import compiled module
-    from src.SLIM_BPR.Cython.SLIM_BPR_Cython_Epoch import SLIM_BPR_Cython_Epoch
+    from src.SLIM_BPR.Cython.SLIM_BPR_Cython_Epoch2 import SLIM_BPR_Cython_Epoch
 
     self.cythonEpoch = SLIM_BPR_Cython_Epoch(self.URM_mask,
                                              self.sparse_weights,
@@ -93,7 +93,7 @@ class SLIM_BPR_Cython(SLIM_BPR_Python):
     # appropriate subfolder and not the project root
 
     compiledModuleSubfolder = "/src/SLIM_BPR/Cython"
-    fileToCompile_list = ['SLIM_BPR_Cython_Epoch.pyx']
+    fileToCompile_list = ['SLIM_BPR_Cython_Epoch2.pyx']
 
     for fileToCompile in fileToCompile_list:
 
