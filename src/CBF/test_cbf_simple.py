@@ -2,7 +2,7 @@ from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
 import numpy as np
-from src.CBF.CBF_tfidf import *
+from src.CBF.CBF import *
 from itertools import product
 
 

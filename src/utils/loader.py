@@ -297,13 +297,24 @@ class Dataset():
         end = np.amax(list(self.playlist_attr_mapper['owner'].values()))+1
         return icm[start:end, :]
 
+    def build_owner_item_matrix(self, ucm, urm):
+        owner_item_matrix = lil_matrix((urm.shape[0], urm.shape[1]))
+        owners = self.build_owner_matrix(ucm).tocsc()
+        owner_item = owners.dot(urm)
+        for playlist_index in range(urm.shape[0]):
+            owner_index = owners.indices[owners.indptr[playlist_index]:owners.indptr[playlist_index+1]]
+            print("This should be 1!", owner_index.shape)
+            owner_item_matrix[playlist_index] = owner_item[owner_index[0]]
+        print("OIM shape:", owner_item_matrix.shape)
+        return owner_item_matrix.tocsr()
+
     def build_title_matrix(self, icm):
         """
         Returns the artist part of icm
         """
         start = np.amin(list(self.playlist_attr_mapper['title'].values()))
         end = np.amax(list(self.playlist_attr_mapper['title'].values()))+1
-        return icm[start:end, :] 
+        return icm[start:end, :]
 
     def build_created_at_matrix(self, icm):
         """
