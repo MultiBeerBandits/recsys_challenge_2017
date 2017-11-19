@@ -7,18 +7,19 @@
 
 #include <eigen3/Eigen/SparseCore>
 
+using namespace Eigen;
+
 namespace mbb {
-template<typename T> class BPRSlim {
+template <typename T> class BPRSlim {
 public:
-  template<typename U,
-      Eigen::StorageOptions O = Eigen::StorageOptions::RowMajor>
-  using SpMat = Eigen::SparseMatrix<U, O>;
+  template <typename U, StorageOptions O = RowMajor>
+  using SpMat = SparseMatrix<U, O>;
 
   BPRSlim() = default;
   BPRSlim(SpMat<T> urm, double learningRate, double lpos, double lneg, int topK,
           double epochMultiplier);
   void fit(int epochs);
-  Eigen::SparseMatrix<double, Eigen::RowMajor> getParameters();
+  Eigen::SparseMatrix<double, RowMajor> getParameters();
 
 private:
   SpMat<T> urm;
@@ -33,6 +34,6 @@ private:
   std::tuple<int, int, int> randomSample();
   void BPRStep(int userIndex, int positiveIndex, int negativeIndex);
 };
-} // end mbb namespace
+} // namespace mbb
 
 #endif // CPP_BPRSLIM_H

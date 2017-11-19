@@ -10,6 +10,7 @@ __pycache__/
 .Python
 env/
 build/
+**/cmake-build-*/
 develop-eggs/
 dist/
 downloads/
@@ -24,7 +25,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-**/cmake-build-*
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -111,6 +111,6 @@ ENV/
 # idea stuff
 .idea/
 
-# Useless folders
+# Useless dirs
 armadillo*/
-eigen*/
+eigen-*/
