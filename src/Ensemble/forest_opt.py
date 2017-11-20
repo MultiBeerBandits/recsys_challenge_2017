@@ -3,7 +3,7 @@ from scipy.sparse import *
 from src.ML.CSLIM_parallel import *
 from src.utils.loader import *
 from src.utils.evaluator import *
-from src.Ensemble.ensemble import fit
+from src.Ensemble.ensemble import fit, fit_cluster
 # Logging stuff
 import logging
 
@@ -39,20 +39,33 @@ def objective(params):
 
 def result(res):
     logging.info("MAP " + str(-res.fun))
-    params = ['XBF', 'CBF', 'UBF']
-    for (p, x_) in zip(params, res.x):
-        logging.info('{}: {}'.format(p, x_))
+    logging.info(str(res.x))
 
-
-def main():
-    space = [(0, 1), # XBF
-         (0, 1), #CBF
-         (0, 1), #UBF
+def linear_ensemble():
+    space = [(0.0, 1.0),  # XBF
+         (0.0, 1.0),  # CBF
+         (0.0, 1.0),  # UBF
+         (0.0,1.0)  # IALS
         ]
-    # best individual
-    # 2.598883982624128, 1e-05, 3.8223372852050046e-05
-    x0 = [0.3, 0.6, 0.2]
-    res = forest_minimize(fit, space, x0=x0, verbose=True, n_calls=20, n_jobs=-1, callback=result)
+
+    x0 = [0.6, 0.7, 0.2, 0.6]
+    res = forest_minimize(fit, space, x0=x0, verbose=True, n_calls=50, n_jobs=-1, callback=result)
+    print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
+    print('Optimal parameters:')
+    params = ['XBF', 'CBF', 'UBF', 'IALS']
+    for (p, x_) in zip(params, res.x):
+        print('{}: {}'.format(p, x_))
+
+def cluster_ensemble():
+    """
+    Ensemble in which we have different weights for each cluster of users
+    """
+    n_cluster = 20
+    space = []
+    for i in range(n_cluster):
+        space.append((0.0, 1.0))
+
+    res = forest_minimize(fit_cluster, space, verbose=True, n_calls=1000, n_jobs=-1, callback=result)
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
     params = ['1', '2', '3']
@@ -61,4 +74,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    linear_ensemble()

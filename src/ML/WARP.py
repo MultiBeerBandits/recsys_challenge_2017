@@ -14,7 +14,7 @@ class WARP():
         self.tr_id_list = None
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=300, n_epochs=30, item_alpha=1e-8, l_rate=0.2):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=30, item_alpha=1e-4, l_rate=0.05):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         model = LightFM(loss='bpr', learning_rate=l_rate, random_state=2016, no_components=no_components, item_alpha=item_alpha, max_sampled=100, user_alpha=item_alpha)
@@ -67,33 +67,6 @@ class WARP():
             tracks_ids = [self.tr_id_list[x] for x in track_cols]
             recs[pl_id] = tracks_ids
         return recs
-
-
-def print_log(row, header=False, spacing=12):
-    top = ''
-    middle = ''
-    bottom = ''
-    for r in row:
-        top += '+{}'.format('-' * spacing)
-        if isinstance(r, str):
-            middle += '| {0:^{1}} '.format(r, spacing - 2)
-        elif isinstance(r, int):
-            middle += '| {0:^{1}} '.format(r, spacing - 2)
-        elif (isinstance(r, float)
-              or isinstance(r, np.float32)
-              or isinstance(r, np.float64)):
-            middle += '| {0:^{1}.5f} '.format(r, spacing - 2)
-        bottom += '+{}'.format('=' * spacing)
-    top += '+'
-    middle += '|'
-    bottom += '+'
-    if header:
-        print(top)
-        print(middle)
-        print(bottom)
-    else:
-        print(middle)
-        print(top)
 
 
 if __name__ == '__main__':

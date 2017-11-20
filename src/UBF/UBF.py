@@ -41,7 +41,7 @@ class UserBasedFiltering(object):
         ucm = dataset.build_ucm()
 
         # add user ratings to ucm
-        ucm = vstack([ucm, urm.transpose().multiply(2)])
+        ucm = vstack([ucm, urm.transpose()])
 
         # build user profile from urm and icm
         icm = dataset.build_icm()

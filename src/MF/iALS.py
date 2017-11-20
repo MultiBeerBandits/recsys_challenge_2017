@@ -6,7 +6,15 @@ from src.utils.evaluator import *
 
 
 class IALS():
-    """docstring for NMF"""
+    """Results:
+    0,027 with 100, 50, 1e-6, 40
+    0,033 with 100, 50, 1e-4, 400
+    0.049 with 200, 50, 1e-4, 400
+    0.051 with 200, 50, 1e-4, 800
+    0.073 with 500, 50, 1e-4, 800
+    0.071 with 500, 50, 1e-5, 800
+
+    """
 
     def __init__(self, urm, features, learning_steps, reg, confidence):
         # Number of latent factors
@@ -35,7 +43,7 @@ class IALS():
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         # initialize a model
-        self.model = implicit.als.AlternatingLeastSquares(factors=self.features, regularization=self.reg, iterations=self.learning_steps, calculate_training_loss=True)
+        self.model = implicit.als.AlternatingLeastSquares(factors=self.features, regularization=self.reg, iterations=self.learning_steps)
 
         # train the model on a sparse matrix of item/user/confidence weights
         self.model.fit(self.urm.transpose().multiply(self.confidence))
@@ -79,7 +87,7 @@ if __name__ == '__main__':
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        ials = IALS(urm, 100, 50, 1e-6, 40)
+        ials = IALS(urm, 600, 50, 1e-4, 800)
         ials.fit(list(tg_playlist), list(tg_tracks), ds)
         recs = ials.predict(list(tg_playlist), list(tg_tracks), ds)
         ev.evaluate_fold(recs)
