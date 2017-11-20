@@ -92,7 +92,7 @@ def fit(params):
     cbf = ContentBasedFiltering()
     ubf = UserBasedFiltering()
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-    ials = IALS(urm.copy(), 600, 50, 1e-4, 800)
+    ials = IALS(urm.copy(), 500, 50, 1e-4, 800)
     xbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
     cbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
     ubf.fit(urm.copy(), tg_playlist, tg_tracks, ds)

@@ -68,7 +68,7 @@ class IALS():
         # convert to csr
         self.R_hat = csr_matrix(self.R_hat)
 
-    def predict(self, target_playlist, target_tracks, dataset, at=5):
+    def predict(self, at=5):
         recs = {}
         for i in range(0, self.R_hat.shape[0]):
             pl_id = self.pl_id_list[i]
