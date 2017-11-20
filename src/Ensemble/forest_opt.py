@@ -1,4 +1,5 @@
 from skopt import forest_minimize
+from skopt.space import Real
 from scipy.sparse import *
 from src.ML.CSLIM_parallel import *
 from src.utils.loader import *
@@ -42,10 +43,10 @@ def result(res):
     logging.info(str(res.x))
 
 def linear_ensemble():
-    space = [(0.0, 1.0),  # XBF
-         (0.0, 1.0),  # CBF
-         (0.0, 1.0),  # UBF
-         (0.0,1.0)  # IALS
+    space = [Real(0.0, 1.0),  # XBF
+         Real(0.0, 1.0),  # CBF
+         Real(0.0, 1.0),  # UBF
+         Real(0.0, 1.0)  # IALS
         ]
 
     x0 = [0.6, 0.7, 0.2, 0.6]

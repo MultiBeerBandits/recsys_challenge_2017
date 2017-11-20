@@ -14,7 +14,6 @@ class IALS():
     0.051 with 200, 50, 1e-4, 800
     0.073 with 500, 50, 1e-4, 800
     0.071 with 500, 50, 1e-5, 800
-
     """
 
     def __init__(self, urm, features, learning_steps, reg, confidence):
@@ -41,8 +40,8 @@ class IALS():
         self.tr_id_list = None
 
     def fit(self, tg_playlist, tg_tracks, dataset):
-        self.pl_id_list = tg_playlist
-        self.tr_id_list = tg_tracks
+        self.pl_id_list = list(tg_playlist)
+        self.tr_id_list = list(tg_tracks)
         # initialize a model
         self.model = implicit.als.AlternatingLeastSquares(factors=self.features, regularization=self.reg, iterations=self.learning_steps)
 
