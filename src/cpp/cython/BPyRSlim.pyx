@@ -52,7 +52,29 @@ cdef extern from "../include/BPRSlim.h" namespace "mbb":
 
 # Cython wrapper of mbb::BPRSlim
 cdef class BPyRSlim:
+    """
+    BPR optimized SLIM, with stochastic gradient descent.
+    """
     cdef BPRSlim[int] bpr
+    """
+    BPRSlim constructor. Initializes the BPR optimization algorithm for
+    a SLIM model. The optimization is performed with stochastic gradient
+    descent, by random sampling with replacement a user u and two items
+    i and j such that i is a positive rated item and j is a negative rated
+    item.
+
+    urm:          csr_matrix      The URM
+    learningRate  float           The SGD learning rate
+    lpos          float           The regularization coefficient for
+                                  positive items
+    lneg          float           The regularization coefficient for
+                                  negative items
+    topK          int             The threshold for topK filtering the
+                                  parameters matrix
+    epochMultiplier float         The multiplier of the epoch length. By
+                                  default an epoch is as long as the number
+                                  of positive items in the urm. 
+    """
     def __cinit__(self,
                   urm,
                   double learningRate,
@@ -61,9 +83,7 @@ cdef class BPyRSlim:
                   int topK,
                   double epochMultiplier):
         assert urm.dtype == int
-        # cdef int[:] indPtr = urm.indptr
-        # cdef int[:] indices = urm.indices
-        # cdef int[:] data = urm.data
+
         cdef int n_rows = urm.shape[0]
         cdef int n_cols = urm.shape[1]
         cdef SparseMatrix[int] c_urm = buildSparseMatrix[int](urm.indptr,
@@ -75,9 +95,25 @@ cdef class BPyRSlim:
                                    topK, epochMultiplier)
 
     def fit(self, int epochs):
+        """
+        Run the BPR optimization process. The optimization is performed with
+        stochastic gradient descent, by random sampling with replacement a
+        user u and two items i and j such that i is a positive rated item and
+        j is a negative rated item.
+        The algorithm runs \p epochs epochs, given that each epoch is
+        <n of non-zero entries of urm> * epochMultiplier
+
+        epochs    int     Number of epochs of the SGD algorithm
+        """
         self.bpr.fit(epochs)
 
     def getParameters(self):
+        """
+        Returns a deep-copy of the parameters matrix. Explicit zeros are
+        removed and return matrix is compressed.
+
+        @return     csr_matrix    The parameters matrix in
+        """
         cdef SparseMatrix[double] W = self.bpr.getParameters()
         # build memoryviews and return sparse matrix
         cdef int *indPtr = W.outerIndexPtr()
