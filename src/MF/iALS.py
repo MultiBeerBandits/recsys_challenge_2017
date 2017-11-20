@@ -3,6 +3,7 @@ from scipy.sparse import *
 import numpy as np
 from src.utils.loader import *
 from src.utils.evaluator import *
+from src.utils.matrix_utils import top_k_filtering
 
 
 class IALS():
@@ -63,6 +64,7 @@ class IALS():
 
         # clean from useless row and columns
         self.R_hat[self.urm.nonzero()] = 0
+        self.R_hat = top_k_filtering(self.R_hat, topK=500)
         # convert to csr
         self.R_hat = csr_matrix(self.R_hat)
 
