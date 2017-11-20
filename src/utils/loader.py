@@ -315,7 +315,6 @@ class Dataset():
 
     def build_owner_item_matrix(self, ucm, urm):
         owners = self.build_owner_matrix(ucm).tocsc()
-        owner_item = owners.dot(urm)
         # for playlist_index in range(urm.shape[0]):
         #     owner_index = owners.indices[owners.indptr[playlist_index]:owners.indptr[playlist_index+1]]
         #     # print("This should be 1!", owner_index.shape)
@@ -323,6 +322,7 @@ class Dataset():
         #         owner_item_matrix[playlist_index] = owner_item[owner_index[0]]
         # this is a playlist playlist sim
         pl_owner_sim = owners.transpose().dot(owners)
+        pl_owner_sim.data = np.ones_like(pl_owner_sim.data)
         owner_item_matrix = pl_owner_sim.dot(urm)
         print("OIM shape:", owner_item_matrix.shape)
         return owner_item_matrix.tocsr()
