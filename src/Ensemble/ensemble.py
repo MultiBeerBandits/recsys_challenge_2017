@@ -34,7 +34,7 @@ class Ensemble(object):
                 current_r_hat = self.max_normalize(models[i].R_hat)
             else:
                 current_r_hat = models[i].R_hat
-            R_hat_mixed += current_r_hat
+            R_hat_mixed += current_r_hat.multiply(params[i])
         return R_hat_mixed.tocsr()
 
     def mix_cluster(self, models, params, tg_playlist, urm=None, icm=None, ds=None):
