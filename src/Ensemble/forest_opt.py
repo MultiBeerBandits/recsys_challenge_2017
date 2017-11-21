@@ -39,7 +39,11 @@ def linear_ensemble():
              Real(0.0, 1.0),  # UBF
              Real(0.0, 1.0)  # IALS
              ]
-    x0 = [0.6, 0.7, 0.2, 0.6]
+    x0 = [1, 0, 0, 0]
+    x1 = [0, 1, 0, 0]
+    x2 = [0, 0, 1, 0]
+    x3 = [0, 0, 0, 1]
+    x0s = [x0, x1, x2, x3]
     # get the current fold
     ds = Dataset(load_tags=True, filter_tag=True)
     ds.set_track_attr_weights(1, 0.9, 0.2, 0.2, 0.2)
@@ -48,7 +52,7 @@ def linear_ensemble():
     ev.cross_validation(5, ds.train_final.copy())
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
     ensemble.fit(urm, list(tg_tracks), list(tg_playlist), ds)
-    res = forest_minimize(objective, space, x0=x0, verbose=True,n_random_starts=20, n_calls=100, n_jobs=-1, callback=result)
+    res = forest_minimize(objective, space, x0=x0s, verbose=True, n_random_starts=20, n_calls=200, n_jobs=-1, callback=result)
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
     params = ['XBF', 'CBF', 'UBF', 'IALS']
