@@ -14,6 +14,7 @@ class IALS():
     0.051 with 200, 50, 1e-4, 800
     0.073 with 500, 50, 1e-4, 800
     0.071 with 500, 50, 1e-5, 800
+    0.069 with 500, 70. 1e-4, 800
     """
 
     def __init__(self, urm, features, learning_steps, reg, confidence):
@@ -88,9 +89,9 @@ if __name__ == '__main__':
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        ials = IALS(urm, 600, 50, 1e-2, 800)
+        ials = IALS(urm, 500, 70, 1e-4, 800)
         ials.fit(list(tg_playlist), list(tg_tracks), ds)
-        recs = ials.predict(list(tg_playlist), list(tg_tracks), ds)
+        recs = ials.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
     print("MAP@5 Final", map_at_five)

@@ -141,3 +141,54 @@ class Ensemble(object):
 
         print("MAP@5 :", map_5)
         return -map_5
+
+
+def main():
+    # Best params:
+    # XBF: 0.0033407193133514488
+    # CBF: 0.38028525074128705
+    # UBF: 0.00962408557454575
+    # IALS: 0.06898631305777138
+    ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
+    ds.set_playlist_attr_weights(0.5, 0.5, 0.5, 0.05, 0.05)
+    ev = Evaluator()
+    params = [0.00334, 0.3802, 0.0096, 0.0689]
+    ev.cross_validation(4, ds.train_final.copy())
+    for i in range(0, 5):
+        ensemble = Ensemble()
+        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+        test_dict = ev.get_test_dict(i)
+        ensemble.fit(urm, list(tg_tracks),
+                list(tg_playlist),
+                ds)
+        recs = ensemble.predict(params)
+        ev.evaluate_fold(recs)
+    map_at_five = ev.get_mean_map()
+    print("MAP@5 ", map_at_five)
+
+    # export csv
+    ensemble = Ensemble()
+    urm = ds.build_train_matrix()
+    tg_playlist = list(ds.target_playlists.keys())
+    tg_tracks = list(ds.target_tracks.keys())
+    # Train the model with the best shrinkage found in cross-validation
+    ensemble.fit(urm,
+                     tg_tracks,
+                     tg_playlist,
+                     ds)
+    recs = ensemble.predict(params)
+    with open('submission_cbf.csv', mode='w', newline='') as out:
+        fieldnames = ['playlist_id', 'track_ids']
+        writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
+        writer.writeheader()
+        for k in tg_playlist:
+            track_ids = ''
+            for r in recs[k]:
+                track_ids = track_ids + r + ' '
+            writer.writerow({'playlist_id': k,
+                             'track_ids': track_ids[:-1]})
+
+
+if __name__ == '__main__':
+    main()
