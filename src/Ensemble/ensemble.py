@@ -189,6 +189,6 @@ def main():
             writer.writerow({'playlist_id': k,
                              'track_ids': track_ids[:-1]})
 
-
 if __name__ == '__main__':
+    print("Ensemble started")
     main()
