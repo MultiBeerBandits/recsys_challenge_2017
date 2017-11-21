@@ -4,7 +4,7 @@ from scipy.sparse import *
 from src.ML.CSLIM_parallel import *
 from src.utils.loader import *
 from src.utils.evaluator import *
-from src.Ensemble.ensemble import fit, fit_cluster
+from src.Ensemble.ensemble import Ensemble
 # Logging stuff
 import logging
 
@@ -14,43 +14,41 @@ logging.basicConfig(filename='ensemble.log',
                     filemode='w',
                     level=logging.DEBUG)
 
+ensemble = Ensemble()
+ev = Evaluator()
 
 def objective(params):
-    # unpack
-    alfa, l1, l2 = params
+    global ensemble, ev
+    print("Current params", str(params))
 
-    print("Current params", alfa, l1, l2)
+    recs = ensemble.predict(params)
+    map_at_five = ev.evaluate_fold(recs)
+    # Make negative because we want to _minimize_ objective
+    out = -map_at_five
 
-    if alfa > 0 and l1 > 0 and l2 > 0:
-        # create all and evaluate
-        ds = Dataset()
-        ev = Evaluator()
-        ev.cross_validation(5, ds.train_final.copy())
-        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        cslim = SLIM(l1, l2, alfa)
-        cslim.fit(urm, tg_tracks, tg_playlist, ds)
-        recs = cslim.predict()
-        map_at_five = ev.evaluate_fold(recs)
-        # Make negative because we want to _minimize_ objective
-        out = -map_at_five
-
-        return out
-    else:
-        return 1000
+    return out
 
 def result(res):
     logging.info("MAP " + str(-res.fun))
     logging.info(str(res.x))
 
 def linear_ensemble():
+    global ensemble, ev
     space = [Real(0.0, 1.0),  # XBF
-         Real(0.0, 1.0),  # CBF
-         Real(0.0, 1.0),  # UBF
-         Real(0.0, 1.0)  # IALS
-        ]
-
+             Real(0.0, 1.0),  # CBF
+             Real(0.0, 1.0),  # UBF
+             Real(0.0, 1.0)  # IALS
+             ]
     x0 = [0.6, 0.7, 0.2, 0.6]
-    res = forest_minimize(fit, space, x0=x0, verbose=True, n_calls=50, n_jobs=-1, callback=result)
+    # get the current fold
+    ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights(1, 0.9, 0.2, 0.2, 0.2)
+    ds.set_playlist_attr_weights(0.5, 0.5, 0.5, 0.05, 0.05)
+    ev = Evaluator()
+    ev.cross_validation(5, ds.train_final.copy())
+    urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+    ensemble.fit(urm, list(tg_tracks), list(tg_playlist), ds)
+    res = forest_minimize(objective, space, x0=x0, verbose=True,n_random_starts=20, n_calls=100, n_jobs=-1, callback=result)
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
     params = ['XBF', 'CBF', 'UBF', 'IALS']
@@ -72,7 +70,6 @@ def cluster_ensemble():
     params = ['1', '2', '3']
     for (p, x_) in zip(params, res.x):
         print('{}: {}'.format(p, x_))
-
 
 if __name__ == '__main__':
     linear_ensemble()

@@ -31,6 +31,9 @@ class Dataset():
         self.created_at_intervals = 30
         self.playlist_duration_intervals = 30
         self.playlist_numtracks_intervals = 30
+        # for numbers of cluster of ratings
+        self.playlist_num_rating_cluster_size = 25
+        self.tracks_num_rating_cluster_size = 25
         # build tracks mappers
         # track_id_mapper maps tracks id to columns of icm
         # format: {'item_id': column_index}
@@ -71,6 +74,7 @@ class Dataset():
         self.duration_weight = 1
         self.playcount_weight = 1
         self.tags_weight = 1
+        self.track_num_rating_weight = 1
 
         # weights of attributes of playlist
         self.created_at_weight = 1
@@ -78,13 +82,15 @@ class Dataset():
         self.title_weight = 1
         self.playlist_duration_weight = 1
         self.playlist_numtracks_weight = 1
+        self.playlist_num_rating_weight = 1
 
-    def set_track_attr_weights(self, art_w, alb_w, dur_w, playcount_w, tags_w):
+    def set_track_attr_weights(self, art_w, alb_w, dur_w, playcount_w, tags_w, num_rating_weight=1):
         self.artist_weight = art_w
         self.album_weight = alb_w
         self.duration_weight = dur_w
         self.playcount_weight = playcount_w
         self.tags_weight = tags_w
+        self.track_num_rating_weight = num_rating_weight
 
     def set_playlist_attr_weights(self, created_at_weight, owner_weight, title_weight, duration_weight, numtracks_weight):
         self.created_at_weight = created_at_weight
@@ -156,7 +162,6 @@ class Dataset():
                     icm[playcount_index, track_index] = self.playcount_weight
                     playcount_index += 1
         return icm
-
 
     def build_iucm(self, test_dict, path='./data/playlists_final'):
         """
@@ -359,7 +364,6 @@ class Dataset():
         end = start + self.playlist_duration_intervals
         return icm[start:end, :]
 
-
     def build_train_matrix(self, filename='csr_urm.npz'):
         """
         Builds the user rating matrix from the dataset.
@@ -426,6 +430,36 @@ class Dataset():
         """
         iucm = self.build_iucm(test_dict)
         return vstack([icm, iucm])
+
+    def add_tracks_num_rating_to_icm(self, icm, urm):
+        """
+        returns the icm with the number of ratings for each track
+        """
+        # row vector with the number of ratings for each track
+        num_ratings = urm.sum(axis=0)
+        rating_cluster = KMeans(n_clusters=self.tracks_num_rating_cluster_size).fit_predict(np.reshape(num_ratings, (-1, 1)))
+        ratings = lil_matrix((self.tracks_num_rating_cluster_size, icm.shape[1]))
+        for i in range(rating_cluster.shape[0]):
+            ratings[rating_cluster[i], i] = self.track_num_rating_weight
+        ratings = ratings.tocsr()
+        icm = vstack([icm, ratings], format='csr')
+
+        return icm
+
+    def add_playlist_num_rating_to_icm(self, ucm, urm):
+        """
+        returns the icm with the number of ratings for each track
+        """
+        # row vector with the number of ratings for each track
+        num_ratings = urm.sum(axis=1)
+        rating_cluster = KMeans(n_clusters=self.playlist_num_rating_cluster_size).fit_predict(np.reshape(num_ratings, (-1, 1)))
+        ratings = lil_matrix((self.playlist_num_rating_cluster_size, ucm.shape[1]))
+        for i in range(len(rating_cluster)):
+            ratings[rating_cluster[i], i] = self.playlist_num_rating_weight
+        ratings = ratings.tocsr()
+        ucm = vstack([ucm, ratings], format='csr')
+
+        return ucm
 
 
 def load_train_final(path):

@@ -88,7 +88,7 @@ if __name__ == '__main__':
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        ials = IALS(urm, 600, 50, 1e-4, 800)
+        ials = IALS(urm, 600, 50, 1e-2, 800)
         ials.fit(list(tg_playlist), list(tg_tracks), ds)
         recs = ials.predict(list(tg_playlist), list(tg_tracks), ds)
         ev.evaluate_fold(recs)

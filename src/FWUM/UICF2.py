@@ -5,7 +5,7 @@ import numpy as np
 import numpy.linalg as LA
 import scipy.sparse.linalg as sLA
 from sklearn.decomposition import TruncatedSVD
-from src.utils.matrix_utils import compute_cosine, top_k_filtering
+from src.utils.matrix_utils import compute_cosine, top_k_filtering, dot_chunked
 
 
 class xSquared():
@@ -30,6 +30,10 @@ class xSquared():
     Idea: two user are similar if the like items with similar features
     """
 
+    """
+    Result: MAP@5: 0.10272261177712429 with dot_chunked ufm 0.8 and ofm 0.2
+    """
+
     def __init__(self):
         self.pl_id_list = []
         self.tr_id_list = []
@@ -47,15 +51,18 @@ class xSquared():
         print("FWUM started!")
         # get ICM from dataset
         icm = dataset.build_icm()
+        icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
         self.urm = urm
         # CONTENT BASED USER PROFILE
         ucm_red = dataset.build_ucm()
+        ucm_red = dataset.add_playlist_num_rating_to_icm(ucm_red, urm)
         # build the user feature matrix
         # FxUt
         ufm = urm.dot(icm.transpose())[[dataset.get_playlist_index_from_id(x) for x in target_playlist]].transpose()
         print("Start filtering")
 
-        ufm = self.filter_by_topic(ufm, dataset).transpose()
+        # ufm = self.filter_by_topic(ufm, dataset).transpose()
+        ufm = top_k_filtering(ufm.transpose(), topK=1000)
         # Iu contains for each user the number of tracks rated
         Iu = urm[[dataset.get_playlist_index_from_id(x) for x in target_playlist]].sum(axis=1)
         # save from divide by zero!
@@ -65,12 +72,12 @@ class xSquared():
         # multiply the ufm by Iu. Normalize UFM
         print("UFM ready")
         ufm = ufm.multiply(Iu).transpose()
-        print(ufm.shape)
         # build owner feature model
         orm = dataset.build_owner_item_matrix(ucm_red, urm)[[dataset.get_playlist_index_from_id(x) for x in target_playlist]]
         ofm = orm.dot(icm.transpose()).transpose()
         # filtering
-        ofm = self.filter_by_topic(ofm, dataset).transpose()
+        # ofm = self.filter_by_topic(ofm, dataset).transpose()
+        ofm = top_k_filtering(ofm, topK=1000).transpose()
         Iu = orm.sum(axis=1)
         # save from divide by zero!
         Iu[Iu == 0] = 1
@@ -79,10 +86,8 @@ class xSquared():
         # multiply the ufm by Iu. Normalize UFM
         print("OFM ready")
         ofm = ofm.multiply(Iu).transpose()
-        print(ofm.shape)
-        ufm = ufm.multiply(0.6) + ofm.multiply(0.4)
-        print(ucm_red.shape)
-        ucm = vstack([ufm, ucm_red[:,[dataset.get_playlist_index_from_id(x) for x in target_playlist]]], format='csr')
+        ufm = ufm.multiply(0.8) + ofm.multiply(0.2)
+        ucm = vstack([ufm, ucm_red[:, [dataset.get_playlist_index_from_id(x) for x in target_playlist]]], format='csr')
         print("UCM ready")
         ## User Based content profile
         # uFxI
@@ -95,32 +100,29 @@ class xSquared():
         # multiply the ufm by Iu. Normalize UFM
         iucm = csr_matrix(iucm.multiply(i_sum))
         # Add playlist to icm
-        print("SHAPE of ICM: ", icm.shape)
         # filter iucm
-        owner = dataset.build_owner_matrix(iucm)
-        owner = top_k_filtering(owner, 50)
+        # owner = dataset.build_owner_matrix(iucm)
+        # owner = top_k_filtering(owner, 50)
 
-        title = dataset.build_title_matrix(iucm)
-        title = top_k_filtering(title, 50)
+        # title = dataset.build_title_matrix(iucm)
+        # title = top_k_filtering(title, 50)
 
-        created_at = dataset.build_created_at_matrix(iucm)
-        created_at = top_k_filtering(created_at, 10)
+        # created_at = dataset.build_created_at_matrix(iucm)
+        # created_at = top_k_filtering(created_at, 10)
 
-        duration = dataset.build_pl_duration_matrix(iucm)
-        duration = top_k_filtering(duration, 10)
+        # duration = dataset.build_pl_duration_matrix(iucm)
+        # duration = top_k_filtering(duration, 10)
 
-        numtracks = dataset.build_numtracks_matrix(iucm)
-        numtracks = top_k_filtering(numtracks, 10)
-        icm = vstack([icm[:, [dataset.get_track_index_from_id(x) for x in target_tracks]], title, owner, created_at, duration, numtracks], format='csr')
+        # numtracks = dataset.build_numtracks_matrix(iucm)
+        # numtracks = top_k_filtering(numtracks, 10)
+        iucm = vstack([icm[:, [dataset.get_track_index_from_id(x) for x in target_tracks]], iucm], format='csr')
 
-        print("UFM and ICM Done!")
-        print(ucm.shape)
-        print(icm.shape)
         # NEIGHBOR FORMATION
         # normalize matrix
-        R_hat_1 = compute_cosine(ucm.transpose(), icm, k_filtering=500, shrinkage=10)
+        # R_hat_1 = compute_cosine(ucm.transpose(), icm, k_filtering=500, shrinkage=10)
+        R_hat_1 = dot_chunked(ucm.transpose(), iucm, topK=500)
 
-        icm = dataset.add_playlist_to_icm(dataset.build_icm(), urm, 0.5)
+        icm = dataset.add_playlist_to_icm(icm, urm, 0.5)
         S_cbf = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x) for x in target_tracks]], icm, k_filtering=100, shrinkage=50)
         norm = S_cbf.sum(axis=1)
         # save from divide by zero!
