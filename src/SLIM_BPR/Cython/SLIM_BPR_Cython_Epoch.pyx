@@ -60,7 +60,9 @@ cdef class SLIM_BPR_Cython_Epoch:
     def __init__(self, URM_mask, sparse_weights, eligibleUsers, S=None,
                  learning_rate = 0.05,
                  lambda_i=0.0025, lambda_j=0.00025,
-                 batch_size = 1, topK=False, sgd_mode='adagrad'):
+                 batch_size = 1,
+                 epochMultiplier=1,
+                 topK=False, sgd_mode='adagrad'):
         """
         URM_mask: URM matrix whose entries are 1 if rating > threshold, 0 otherwise.
         sparse_weights: if True use sparse matrix for Weights matrix. Otherwise it's dense.
@@ -71,7 +73,7 @@ cdef class SLIM_BPR_Cython_Epoch:
 
         URM_mask = check_matrix(URM_mask, 'csr')
 
-        self.numPositiveIteractions = int(URM_mask.nnz * 5)
+        self.numPositiveIteractions = int(URM_mask.nnz * epochMultiplier)
         self.n_users = URM_mask.shape[0]
         self.n_items = URM_mask.shape[1]
         self.topK = topK

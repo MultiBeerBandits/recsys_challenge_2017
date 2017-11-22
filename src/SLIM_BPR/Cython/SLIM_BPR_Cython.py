@@ -34,7 +34,7 @@ class SLIM_BPR_Cython(SLIM_BPR_Python):
       print("Compilation Complete")
 
   def fit(self, S=None, epochs=30, logFile=None, URM_test=None, minRatingsPerUser=1,
-          batch_size=1000, validate_every_N_epochs=1, start_validation_after_N_epochs=0,
+          batch_size=1000, epochMultiplier=1, validate_every_N_epochs=1, start_validation_after_N_epochs=0,
           lambda_i=0.0025, lambda_j=0.00025, learning_rate=0.05, topK=False, sgd_mode='adagrad'):
 
     # if topK!= False:
@@ -63,7 +63,7 @@ class SLIM_BPR_Cython(SLIM_BPR_Python):
     self.sgd_mode = sgd_mode
 
     # Import compiled module
-    from src.SLIM_BPR.Cython.SLIM_BPR_Cython_Epoch2 import SLIM_BPR_Cython_Epoch
+    from src.SLIM_BPR.Cython.SLIM_BPR_Cython_Epoch import SLIM_BPR_Cython_Epoch
 
     self.cythonEpoch = SLIM_BPR_Cython_Epoch(self.URM_mask,
                                              self.sparse_weights,
@@ -72,6 +72,7 @@ class SLIM_BPR_Cython(SLIM_BPR_Python):
                                              topK=topK,
                                              learning_rate=learning_rate,
                                              batch_size=1,
+                                             epochMultiplier=epochMultiplier,
                                              sgd_mode=sgd_mode)
 
     # Cal super.fit to start training
@@ -85,6 +86,7 @@ class SLIM_BPR_Cython(SLIM_BPR_Python):
                                                         lambda_i=lambda_i,
                                                         lambda_j=lambda_j,
                                                         learning_rate=learning_rate,
+                                                        epochMultiplier=epochMultiplier,
                                                         topK=topK)
 
   def runCompilationScript(self):
@@ -93,7 +95,7 @@ class SLIM_BPR_Cython(SLIM_BPR_Python):
     # appropriate subfolder and not the project root
 
     compiledModuleSubfolder = "/src/SLIM_BPR/Cython"
-    fileToCompile_list = ['SLIM_BPR_Cython_Epoch2.pyx']
+    fileToCompile_list = ['SLIM_BPR_Cython_Epoch.pyx']
 
     for fileToCompile in fileToCompile_list:
 

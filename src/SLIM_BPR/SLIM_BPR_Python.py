@@ -171,7 +171,7 @@ class SLIM_BPR_Python(BPR_Sampling, Similarity_Matrix_Recommender, Recommender):
             self.S[j, j] = 0
 
     def fit(self, epochs=30, logFile=None, URM_test=None, minRatingsPerUser=1,
-            batch_size = 1000, validate_every_N_epochs = 1, start_validation_after_N_epochs = 0,
+            batch_size = 1000, epochMultiplier=1, validate_every_N_epochs = 1, start_validation_after_N_epochs = 0,
             lambda_i = 0.0025, lambda_j = 0.00025, learning_rate = 0.05, topK = False):
 
 
@@ -189,12 +189,13 @@ class SLIM_BPR_Python(BPR_Sampling, Similarity_Matrix_Recommender, Recommender):
                                     lambda_i = lambda_i,
                                     lambda_j = lambda_j,
                                     learning_rate = learning_rate,
+                                    epochMultiplier=epochMultiplier,
                                     topK = topK)
 
 
 
     def fit_alreadyInitialized(self, epochs=30, logFile=None, URM_test=None, minRatingsPerUser=1,
-            batch_size = 1000, validate_every_N_epochs = 1, start_validation_after_N_epochs = 0,
+            batch_size = 1000, epochMultiplier=1, validate_every_N_epochs = 1, start_validation_after_N_epochs = 0,
             lambda_i = 0.0025, lambda_j = 0.00025, learning_rate = 0.05, topK = False):
         """
         Fits the model performing a round of testing at the end of each epoch
