@@ -70,21 +70,6 @@ class xSquared(BaseRecommender):
         ufm = np.multiply(ufm, Iu)
         self.ufm = ufm
         print("User feature matrix built done")
-        # Feature weighting step
-        # put to one each element in ufm
-        # ufm_ones = ufm.copy()
-        # ufm_ones[ufm.nonzero()] = 1
-        # # first build IUF(f)
-        # uf = ufm_ones.sum(axis=0)
-        # uf_copy = uf.copy()
-        # uf_copy[uf_copy == 0] = 1
-        # iuf = np.reciprocal(uf_copy)
-        # iuf[uf == 0] = 0
-        # iuf = csr_matrix(iuf)
-        # iuf.data = float(dataset.playlists_number) * iuf.data
-        # iuf.data = np.log(iuf.data)
-        # self.ufm = self.ufm.multiply(iuf)
-        print("Feature weighting done")
 
         # NEIGHBOR FORMATION
         # normalize matrix

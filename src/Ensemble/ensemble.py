@@ -27,7 +27,7 @@ class Ensemble(object):
         params: array of attributes
         """
         R_hat_mixed = lil_matrix(
-            (models[0].R_hat.shape[0], models[0].R_hat.shape[1]))
+            (self.models[0].R_hat.shape[0], self.models[0].R_hat.shape[1]))
         for i in range(len(self.models)):
             if self.normalize_ratings:
                 current_r_hat = self.max_normalize(self.models[i].R_hat)

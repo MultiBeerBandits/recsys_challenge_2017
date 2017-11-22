@@ -6,8 +6,9 @@ import numpy.linalg as la
 import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
-from src.utils.matrix_utils import compute_cosine, top_k_filtering, max_normalize
+from src.utils.matrix_utils import compute_cosine, top_k_filtering, max_normalize, cluster_per_n_rating
 from src.utils.BaseRecommender import BaseRecommender
+from src.utils.plotter import visualize_2d
 
 
 class Popularity(BaseRecommender):
@@ -118,6 +119,9 @@ def main():
                 ds)
         recs = pop.predict()
         ev.evaluate_fold(recs)
+        rating_cluster = cluster_per_n_rating(urm, tg_playlist, ds, 10)
+        mpc = ev.map_per_cluster(tg_playlist, rating_cluster, 10)
+        visualize_2d(range(10), mpc, "Cluster N Rating", "Map@5", "MAP per cluster POP")
     map_at_five = ev.get_mean_map()
     print("MAP@5 ", map_at_five)
 

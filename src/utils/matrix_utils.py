@@ -223,3 +223,15 @@ def max_normalize(X):
         max_r = X.max(axis=1)
         max_r.data = np.reciprocal(max_r.data)
         return X.multiply(max_r)
+
+
+def normalize_by_row(X):
+    """
+    Normalizes matrix by rows
+    """
+    # normalize S_mixed
+    x_norm = X.sum(axis=1)
+    x_norm[x_norm == 0] = 1
+    # normalize s
+    X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)))
+    return X

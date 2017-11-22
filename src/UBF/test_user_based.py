@@ -1,7 +1,7 @@
 from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
-from src.UBF.UBF import *
+from src.UBF.UBF2 import *
 from src.utils.matrix_utils import cluster_per_n_rating
 from src.utils.plotter import visualize_2d
 
@@ -13,6 +13,8 @@ def main():
     for shr in range(10, 150, 10):
         for k_f in range(20, 100, 5):
             ds = Dataset()
+            ds.set_track_attr_weights(1, 0.9, 0.1, 0.1, 0.1, 0.05)
+            ds.set_playlist_attr_weights(0.5, 0.6, 0.6, 0.1, 0.1)
             ev = Evaluator()
             ev.cross_validation(5, ds.train_final.copy())
             ubf = UserBasedFiltering()
