@@ -78,7 +78,7 @@ class Ensemble(object):
     def predict(self, params, at=5):
         # Mix them all
         models = [self.xbf, self.cbf, self.ubf, self.ials]
-        R_hat = self.mix(models, params, normalize_ratings=True)
+        R_hat = self.mix(models, params, normalize_ratings=False)
         """
         returns a dictionary of
         'pl_id': ['tr_1', 'tr_at'] for each playlist in target playlist
@@ -115,21 +115,12 @@ class Ensemble(object):
         ev = Evaluator()
         ev.cross_validation(5, ds.train_final.copy())
         xbf = xSquared()
-        # cbf = ContentBasedFiltering()
-        # ubf = UserBasedFiltering()
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         xbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        # cbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        # ubf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
         recs_xbf = xbf.predict()
-        # recs_cbf = cbf.predict()
-        # recs_ubf = ubf.predict()
-        ev.evaluate_fold(recs_xbf)
-        # ev.evaluate_fold(recs_cbf)
-        # ev.evaluate_fold(recs_ubf)
         # Mix them all
         models = [xbf]  # cbf, ubf]
-        R_hat_mixed = mix(models, params, normalize_ratings=True)
+        R_hat_mixed = mix(models, params, normalize_ratings=False)
         recs_mix = predict(R_hat_mixed, list(tg_playlist), list(tg_tracks))
         map_5 = ev.evaluate_fold(recs_mix)
 
@@ -155,7 +146,7 @@ def main():
     ev = Evaluator()
     params = [0.00334, 0.3802, 0.0096, 0.0689]
     ev.cross_validation(4, ds.train_final.copy())
-    for i in range(0, 5):
+    for i in range(0, 4):
         ensemble = Ensemble()
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         test_dict = ev.get_test_dict(i)

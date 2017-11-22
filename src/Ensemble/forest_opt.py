@@ -114,4 +114,4 @@ def cluster_ensemble():
         print('{}: {}'.format(p, x_))
 
 if __name__ == '__main__':
-    opt_sim_ensemble()
+    linear_ensemble()
