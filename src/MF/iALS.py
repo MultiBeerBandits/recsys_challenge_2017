@@ -94,9 +94,12 @@ if __name__ == '__main__':
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        ials = IALS(urm, 500, 70, 1e-4, 800)
+        ials = IALS(500, 50, 1e-4, 800)
         ials.fit(list(tg_playlist), list(tg_tracks), ds)
         recs = ials.predict()
         ev.evaluate_fold(recs)
+        rating_cluster = cluster_per_n_rating(urm, tg_playlist, ds, 10)
+        mpc = ev.map_per_cluster(tg_playlist, rating_cluster, 10)
+        visualize_2d(range(10), mpc, "Cluster N Rating", "Map@5", "MAP per cluster POP")
     map_at_five = ev.get_mean_map()
     print("MAP@5 Final", map_at_five)

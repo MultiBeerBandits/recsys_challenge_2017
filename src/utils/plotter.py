@@ -286,7 +286,7 @@ def visualize_2d(x, y, x_label, y_label, title):
     plt.ylabel(y_label)
     plt.xlabel(x_label)
     plt.title(title)
-    plt.show()
+    plt.savefig(title)
 
 
 

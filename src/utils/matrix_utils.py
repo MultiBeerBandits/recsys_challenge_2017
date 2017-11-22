@@ -25,11 +25,18 @@ def top_k_filtering(matrix, topK):
                 matrix[row_i][sorted_idx] = 0
     return matrix
 
+
 def cluster_per_n_rating(urm, tg_playlist, ds, n_cluster):
     urm = urm[[ds.get_playlist_index_from_id(x) for x in tg_playlist]]
     n_rating = urm.sum(axis=1)
     rating_cluster = KMeans(n_clusters=n_cluster).fit_predict(n_rating)
     return rating_cluster
+
+def cluster_per_ucm(urm, tg_playlist, ds, n_cluster):
+    ucm = ds.build_ucm()
+    ucm = ucm[:, [ds.get_playlist_index_from_id(x) for x in tg_playlist]].transpose()
+    ucm_cluster = KMeans(n_clusters=n_cluster).fit_predict(ucm)
+    return ucm_cluster
 
 
 def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=100):

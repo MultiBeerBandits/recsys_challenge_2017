@@ -5,7 +5,7 @@ import numpy.linalg as LA
 from sklearn.decomposition import TruncatedSVD
 from src.utils.BaseRecommender import BaseRecommender
 
-
+# MAP 0.08440398099977366
 class xSquared(BaseRecommender):
     """
     Rationale:

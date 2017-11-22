@@ -140,33 +140,32 @@ def main():
     ds = Dataset(load_tags=True, filter_tag=True)
     ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
     ds.set_playlist_attr_weights(0.5, 0.5, 0.5, 0.05, 0.05)
-    ev = Evaluator()
-    params = [0.00334, 0.3802, 0.0096, 0.0689]
-    ev.cross_validation(4, ds.train_final.copy())
-    for i in range(0, 4):
-        ensemble = Ensemble()
-        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        test_dict = ev.get_test_dict(i)
-        ensemble.fit(urm, list(tg_tracks),
-                list(tg_playlist),
-                ds)
-        recs = ensemble.predict(params)
-        ev.evaluate_fold(recs)
-    map_at_five = ev.get_mean_map()
-    print("MAP@5 ", map_at_five)
+    params = [0.30860, 0.85577, 0.07349, 0.03564, 0.00063265]
+    # create all the models
+    cbf = ContentBasedFiltering()
+    xbf = xSquared()
+    ials = IALS(500, 50, 1e-4, 800)
+    ubf = UserBasedFiltering()
+    # bpr_cslim = create_BPR_SLIM(urm, ds)
+    pop = Popularity()
+
+    # add models to list of models
+    models = [xbf, cbf, ubf, ials, pop]
+
+    # create the ensemble
+    ensemble = Ensemble(models)
 
     # export csv
-    ensemble = Ensemble()
     urm = ds.build_train_matrix()
     tg_playlist = list(ds.target_playlists.keys())
     tg_tracks = list(ds.target_tracks.keys())
-    # Train the model with the best shrinkage found in cross-validation
+    # Train the model
     ensemble.fit(urm,
-                     tg_tracks,
-                     tg_playlist,
-                     ds)
+                 tg_tracks,
+                 tg_playlist,
+                 ds)
     recs = ensemble.predict(params)
-    with open('submission_cbf.csv', mode='w', newline='') as out:
+    with open('submission_ensemble.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()
@@ -176,6 +175,7 @@ def main():
                 track_ids = track_ids + r + ' '
             writer.writerow({'playlist_id': k,
                              'track_ids': track_ids[:-1]})
+
 
 if __name__ == '__main__':
     print("Ensemble started")

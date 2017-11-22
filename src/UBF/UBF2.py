@@ -11,6 +11,8 @@ from src.utils.BaseRecommender import BaseRecommender
 
 class UserBasedFiltering(BaseRecommender):
 
+    # MAP@5: 0.0652718087913743
+
     def __init__(self, shrinkage=50, k_filtering=200):
         # final matrix of predictions
         self.R_hat = None
@@ -45,7 +47,7 @@ class UserBasedFiltering(BaseRecommender):
         ucm = dataset.build_ucm()
 
         # add user ratings to ucm
-        ucm = vstack([ucm, urm.transpose()])
+        ucm = vstack([ucm, urm.transpose()], format='csr')
 
         # compute cosine similarity between users
         S = compute_cosine(ucm.transpose()[[dataset.get_playlist_index_from_id(x)
