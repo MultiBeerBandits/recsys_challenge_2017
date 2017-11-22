@@ -8,7 +8,7 @@ from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
 
 
-class ContentBasedFiltering(object):
+class UserBasedFiltering(object):
 
     def __init__(self):
         # final matrix of predictions
@@ -35,33 +35,47 @@ class ContentBasedFiltering(object):
         self.tr_id_list = list(target_tracks)
         self.dataset = dataset
         S = None
-        print("CBF started")
-        # get ICM from dataset, assume it already cleaned
+        print("UBF started")
+
+        # get UCM from dataset
+        ucm = dataset.build_ucm()
+
+        # add user ratings to ucm
+        ucm = vstack([ucm, urm.transpose()])
+
+        # build user profile from urm and icm
         icm = dataset.build_icm()
-        # icm = self.applytfidf(icm)
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.5)
-        print("SHAPE of ICM: ", icm.shape)
-        S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
-                                      for x in self.tr_id_list]], icm, k_filtering=200, shrinkage=50)
+        ufm = urm.dot(icm.transpose())
+
+        # Iu contains for each user the number of tracks rated
+        Iu = urm.sum(axis=1)
+        # save from divide by zero!
+        Iu[Iu == 0] = 1
+        # since we have to divide the ufm get the reciprocal of this vector
+        Iu = np.reciprocal(Iu)
+        # multiply the ufm by Iu. Normalize UFM
+        ufm = ufm.multiply(Iu).transpose()
+
+        ucm = vstack([ucm, ufm], format='csr')
+
+        # compute cosine similarity between users
+        S = compute_cosine(ucm.transpose()[[dataset.get_playlist_index_from_id(x)
+                                            for x in self.pl_id_list]], ucm, k_filtering=200, shrinkage=50)
         s_norm = S.sum(axis=1)
+        s_norm[s_norm == 0] = 1
         # normalize s
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
         # compute ratings
         print("Similarity matrix ready!")
-        urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
-                           for x in self.pl_id_list]]
-        # s_norm = S.sum(axis=1)
-        # normalize s
-        # S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
-        self.S = S.transpose()
-        # compute ratings
-        R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
-        # eliminate useless columns
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(x)
-                                      # for x in self.tr_id_list]]
+        urm_cleaned = urm[:, [dataset.get_track_index_from_id(x)
+                              for x in self.tr_id_list]]
+
+        R_hat = S.dot(urm_cleaned)
+
+        # clean from already rated items
         print("R_hat done")
-        urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
-                                      for x in self.tr_id_list]]
+        urm_cleaned = urm_cleaned[[dataset.get_playlist_index_from_id(x)
+                                   for x in self.pl_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
         # eliminate playlist that are not target, already done, to check

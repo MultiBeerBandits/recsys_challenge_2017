@@ -29,52 +29,65 @@ def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=10
     """
     Returns X_shape[0]xY_shape[1]
     """
-    from scipy.sparse.linalg import norm
-    import multiprocessing as mp
+    if sps.issparse(X):
+        from scipy.sparse.linalg import norm
+        import multiprocessing as mp
 
-    x_norm = norm(X, axis=1)
-    x_norm[x_norm == 0] = 1
-    X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)).transpose())
-    y_norm = norm(Y, axis=0)
-    y_norm[y_norm == 0] = 1
-    Y = Y.multiply(np.reciprocal(y_norm))
-    Y_ones = Y.copy()
-    Y_ones.data = np.ones_like(Y_ones.data)
+        x_norm = norm(X, axis=1)
+        x_norm[x_norm == 0] = 1
+        X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)).transpose())
+        y_norm = norm(Y, axis=0)
+        y_norm[y_norm == 0] = 1
+        Y = Y.multiply(np.reciprocal(y_norm))
+        Y_ones = Y.copy()
+        Y_ones.data = np.ones_like(Y_ones.data)
 
-    if n_threads == 0:
-        n_threads = mp.cpu_count()
+        if n_threads == 0:
+            n_threads = mp.cpu_count()
 
-    worker_matrix_chunks = []
-    worker_chunksize = X.shape[0] // n_threads
-    for i in range(0, X.shape[0], worker_chunksize):
-        if i + worker_chunksize > X.shape[0]:
-            end = X.shape[0]
-        else:
-            end = i + worker_chunksize
-        worker_matrix_chunks.append({'start': i, 'end': end})
-
-    # Build a list of parameters to ship to pool workers
-    separated_tasks = []
-    for chunk in worker_matrix_chunks:
-        separated_tasks.append([chunk,
-                                X,
-                                Y,
-                                Y_ones,
-                                k_filtering,
-                                shrinkage,
-                                chunksize])
-
-    result = None
-    with mp.Pool(n_threads) as pool:
-        print('Running {:d} workers...'.format(n_threads))
-        submatrices = pool.map(_work_compute_cosine, separated_tasks)
-        submatrices.sort(key=lambda x: x['start'])
-
-        for submatrix in submatrices:
-            if result is None:
-                result = submatrix['result']
+        worker_matrix_chunks = []
+        worker_chunksize = X.shape[0] // n_threads
+        for i in range(0, X.shape[0], worker_chunksize):
+            if i + worker_chunksize > X.shape[0]:
+                end = X.shape[0]
             else:
-                result = sps.vstack([result, submatrix['result']])
+                end = i + worker_chunksize
+            worker_matrix_chunks.append({'start': i, 'end': end})
+
+        # Build a list of parameters to ship to pool workers
+        separated_tasks = []
+        for chunk in worker_matrix_chunks:
+            separated_tasks.append([chunk,
+                                    X,
+                                    Y,
+                                    Y_ones,
+                                    k_filtering,
+                                    shrinkage,
+                                    chunksize])
+
+        result = None
+        with mp.Pool(n_threads) as pool:
+            print('Running {:d} workers...'.format(n_threads))
+            submatrices = pool.map(_work_compute_cosine, separated_tasks)
+            submatrices.sort(key=lambda x: x['start'])
+
+            for submatrix in submatrices:
+                if result is None:
+                    result = submatrix['result']
+                else:
+                    result = sps.vstack([result, submatrix['result']])
+    else:
+        # if not sparse the cosine is only the chunked dot product
+        from scipy.linalg import norm
+        x_norm = norm(X, axis=1)
+        x_norm[x_norm == 0] = 1
+        x_norm = np.reciprocal(x_norm)
+        x_norm = np.reshape(x_norm, (-1, 1))
+        X = np.multiply(X, x_norm)
+        y_norm = norm(Y, axis=0)
+        y_norm[y_norm == 0] = 1
+        Y = np.multiply(Y, np.reciprocal(y_norm))
+        result = sps.csr_matrix(dot_chunked(X, Y, k_filtering))
     return result
 
 
@@ -194,3 +207,12 @@ def _worker_dot_chunked(params):
         else:
             result = sps.vstack([result, sub_matrix], format='csr')
     return {'result': result, 'start': start}
+
+
+def max_normalize(X):
+        """
+        Normalizes X by rows dividing each row by its max
+        """
+        max_r = X.max(axis=1)
+        max_r.data = np.reciprocal(max_r.data)
+        return X.multiply(max_r)

@@ -3,10 +3,19 @@ from scipy.sparse import *
 import numpy as np
 from src.utils.loader import *
 from src.utils.evaluator import *
+from src.utils.matrix_utils import top_k_filtering
 
 
 class IALS():
-    """docstring for NMF"""
+    """Results:
+    0,027 with 100, 50, 1e-6, 40
+    0,033 with 100, 50, 1e-4, 400
+    0.049 with 200, 50, 1e-4, 400
+    0.051 with 200, 50, 1e-4, 800
+    0.073 with 500, 50, 1e-4, 800
+    0.071 with 500, 50, 1e-5, 800
+    0.069 with 500, 70. 1e-4, 800
+    """
 
     def __init__(self, urm, features, learning_steps, reg, confidence):
         # Number of latent factors
@@ -32,10 +41,10 @@ class IALS():
         self.tr_id_list = None
 
     def fit(self, tg_playlist, tg_tracks, dataset):
-        self.pl_id_list = tg_playlist
-        self.tr_id_list = tg_tracks
+        self.pl_id_list = list(tg_playlist)
+        self.tr_id_list = list(tg_tracks)
         # initialize a model
-        self.model = implicit.als.AlternatingLeastSquares(factors=self.features, regularization=self.reg, iterations=self.learning_steps, calculate_training_loss=True)
+        self.model = implicit.als.AlternatingLeastSquares(factors=self.features, regularization=self.reg, iterations=self.learning_steps)
 
         # train the model on a sparse matrix of item/user/confidence weights
         self.model.fit(self.urm.transpose().multiply(self.confidence))
@@ -55,10 +64,11 @@ class IALS():
 
         # clean from useless row and columns
         self.R_hat[self.urm.nonzero()] = 0
+        self.R_hat = top_k_filtering(self.R_hat, topK=500)
         # convert to csr
         self.R_hat = csr_matrix(self.R_hat)
 
-    def predict(self, target_playlist, target_tracks, dataset, at=5):
+    def predict(self, at=5):
         recs = {}
         for i in range(0, self.R_hat.shape[0]):
             pl_id = self.pl_id_list[i]
@@ -79,9 +89,9 @@ if __name__ == '__main__':
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        ials = IALS(urm, 100, 50, 1e-6, 40)
+        ials = IALS(urm, 500, 70, 1e-4, 800)
         ials.fit(list(tg_playlist), list(tg_tracks), ds)
-        recs = ials.predict(list(tg_playlist), list(tg_tracks), ds)
+        recs = ials.predict()
         ev.evaluate_fold(recs)
     map_at_five = ev.get_mean_map()
     print("MAP@5 Final", map_at_five)

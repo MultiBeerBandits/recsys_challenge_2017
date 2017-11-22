@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.cluster import KMeans
 from sklearn.decomposition import TruncatedSVD
+from src.utils.cluster import build_user_cluster
 
 
 def plot_km_sse():
@@ -53,6 +54,7 @@ def km_sse_playcount():
     plt.title("Playcount SSE")
     plt.show()
 
+
 def km_sse_created_at():
     created_ats = []
     with open('./data/playlists_final.csv', newline='') as csv_file:
@@ -74,6 +76,47 @@ def km_sse_created_at():
     plt.xlabel("Cluster Size")
     plt.title("Create at SSE")
     plt.show()
+
+def km_sse_num_rating():
+    """
+    25 cluster seems good
+    """
+    dataset = Dataset()
+    urm = dataset.build_train_matrix()
+    num_rating = np.ravel(urm.sum(axis=0))
+    sse = []
+    for i in range(10, 40):
+        k_m = KMeans(n_clusters=i)
+        rating_cluster = k_m.fit_predict(np.reshape(num_rating, (-1, 1)))
+        print((k_m.inertia_ / len(num_rating)) / 1e4)
+        sse.append((k_m.inertia_ / len(num_rating)) / 1e4)
+    fig, ax = plt.subplots()
+    plt.plot(range(10, 40), sse, 'ro')
+    plt.ylabel("SSE for Created At")
+    plt.xlabel("Cluster Size")
+    plt.title("Create at SSE")
+    plt.show()
+
+def km_sse_user_num_rating():
+    """
+    25 cluster seems good
+    """
+    dataset = Dataset()
+    urm = dataset.build_train_matrix()
+    num_rating = np.ravel(urm.sum(axis=1))
+    sse = []
+    for i in range(10, 40):
+        k_m = KMeans(n_clusters=i)
+        rating_cluster = k_m.fit_predict(np.reshape(num_rating, (-1, 1)))
+        print((k_m.inertia_ / len(num_rating)) / 1e4)
+        sse.append((k_m.inertia_ / len(num_rating)) / 1e4)
+    fig, ax = plt.subplots()
+    plt.plot(range(10, 40), sse, 'ro')
+    plt.ylabel("SSE for Created At")
+    plt.xlabel("Cluster Size")
+    plt.title("Create at SSE")
+    plt.show()
+
 
 def plot_duration():
     durations = []
@@ -174,6 +217,67 @@ def plot_created_at():
     plt.show()
 
 
+def plot_km_user_cluster():
+    ds = Dataset()
+    urm = ds.build_train_matrix()
+    ucm = ds.build_ucm()
+    icm = ds.build_icm()
+
+    sse = []
+    for i in range(10, 40):
+        X = getUCM(urm, icm, ucm)
+        k_m = KMeans(n_clusters=i)
+        cluster = k_m.fit_predict(X)
+        print((k_m.inertia_ / len(cluster)))
+        sse.append((k_m.inertia_ / len(cluster)))
+    fig, ax = plt.subplots()
+    plt.plot(range(10, 40), sse, 'ro')
+    plt.ylabel("SSE for Created At")
+    plt.xlabel("Cluster Size")
+    plt.title("Create at SSE")
+    plt.show()
+
+
+def getUCM(urm, icm, ucm):
+    # first build the user feature matrix: UxF (features of rated items)
+    ufm = urm.dot(icm.transpose())
+
+    # normalize dividing by rating of each user
+    Nu = urm.sum(axis=1)
+    Iu = np.copy(Nu)
+    # save from divide by zero!
+    Iu[Iu == 0] = 1
+    # since we have to divide the upm get the reciprocal of this vector
+    Iu = np.reciprocal(Iu)
+    # multiply the ufm by Iu. Normalize UFM
+    ufm = ufm.multiply(Iu)
+
+    # add a column for the number of rating
+    ufm = hstack([ufm, Nu], format='csr')
+
+    # stack all matrices horizontally
+    ucm = hstack([urm, ufm, ucm.transpose()], format='csr')
+
+    return ucm
+
+
+def plot_num_rating():
+    dataset = Dataset()
+    urm = dataset.build_train_matrix()
+    num_rating = np.ravel(urm.sum(axis=0))
+    print(num_rating.shape)
+    fig, ax = plt.subplots()
+    ax.scatter(num_rating, np.ones_like(num_rating))
+    plt.show()
+    # Do K-means
+    rating_cluster = KMeans(n_clusters=22).fit_predict(
+        np.reshape(num_rating, (-1, 1)))
+    fig, ax = plt.subplots()
+    ax.scatter(num_rating[:100], np.zeros_like(
+        num_rating[:100]), c=rating_cluster[:100])
+    plt.show()
+
+
 
 if __name__ == '__main__':
-    km_sse_created_at()
+    km_sse_user_num_rating()
