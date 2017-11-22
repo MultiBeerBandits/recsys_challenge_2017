@@ -6,11 +6,12 @@ import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
+from src.utils.BaseRecommender import BaseRecommender
 
 
-class ContentBasedFiltering(object):
+class ContentBasedFiltering(BaseRecommender):
 
-    def __init__(self):
+    def __init__(self, shrinkage=50, k_filtering=200):
         # final matrix of predictions
         self.R_hat = None
 
@@ -19,7 +20,10 @@ class ContentBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200, test_dict={}):
+        self.shrinkage = shrinkage
+        self.k_filtering = k_filtering
+
+    def fit(self, urm, target_playlist, target_tracks, dataset):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -42,7 +46,10 @@ class ContentBasedFiltering(object):
         icm = dataset.add_playlist_to_icm(icm, urm, 0.5)
         print("SHAPE of ICM: ", icm.shape)
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
-                                      for x in self.tr_id_list]], icm, k_filtering=200, shrinkage=50)
+                                            for x in self.tr_id_list]],
+                           icm,
+                           k_filtering=self.k_filtering,
+                           shrinkage=self.shrinkage)
         s_norm = S.sum(axis=1)
         # normalize s
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
@@ -94,6 +101,9 @@ class ContentBasedFiltering(object):
             tracks_ids = [self.tr_id_list[x] for x in track_cols]
             recs[pl_id] = tracks_ids
         return recs
+
+    def getR_hat(self):
+        return self.R_hat
 
 
     def get_model(self):

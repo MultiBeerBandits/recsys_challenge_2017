@@ -6,11 +6,12 @@ import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
+from src.utils.BaseRecommender import BaseRecommender
 
 
-class UserBasedFiltering(object):
+class UserBasedFiltering(BaseRecommender):
 
-    def __init__(self):
+    def __init__(self, shrinkage=50, k_filtering=200):
         # final matrix of predictions
         self.R_hat = None
 
@@ -19,7 +20,10 @@ class UserBasedFiltering(object):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200, test_dict={}):
+        self.shrinkage = shrinkage
+        self.k_filtering = k_filtering
+
+    def fit(self, urm, target_playlist, target_tracks, dataset):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -60,7 +64,10 @@ class UserBasedFiltering(object):
 
         # compute cosine similarity between users
         S = compute_cosine(ucm.transpose()[[dataset.get_playlist_index_from_id(x)
-                                            for x in self.pl_id_list]], ucm, k_filtering=200, shrinkage=50)
+                                            for x in self.pl_id_list]],
+                           ucm,
+                           k_filtering=self.k_filtering,
+                           shrinkage=self.shrinkage)
         s_norm = S.sum(axis=1)
         s_norm[s_norm == 0] = 1
         # normalize s
@@ -109,6 +116,8 @@ class UserBasedFiltering(object):
             recs[pl_id] = tracks_ids
         return recs
 
+    def getR_hat(self):
+        return self.R_hat
 
     def get_model(self):
         """

@@ -1,7 +1,8 @@
 from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
-from user_based import *
+from src.UBF.UBF import *
+from src.utils.matrix_utils import cluster_per_n_rating
 
 
 def main():
@@ -19,6 +20,9 @@ def main():
                 ubf.fit(urm, tg_playlist, tg_tracks, ds, shr, k_f)
                 recs = ubf.predict()
                 ev.evaluate_fold(recs)
+                rating_cluster = cluster_per_n_rating(urm, tg_playlist, ds, 10)
+                mpc = ev.map_per_cluster(tg_playlist, rating_cluster, 10)
+                visualize_2d(range(10), mpc, "Cluster N Rating", "Map@5", "MAP per cluster UBF")
             map_at_five = ev.get_mean_map()
             print("MAP@5 [Shrinkage = " + str(shr) +  ' K_f ' + str(k_f) + ']', map_at_five)
             # Store best shrinkage factor according to highest MAP

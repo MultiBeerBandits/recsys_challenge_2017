@@ -77,6 +77,7 @@ def km_sse_created_at():
     plt.title("Create at SSE")
     plt.show()
 
+
 def km_sse_num_rating():
     """
     25 cluster seems good
@@ -96,6 +97,7 @@ def km_sse_num_rating():
     plt.xlabel("Cluster Size")
     plt.title("Create at SSE")
     plt.show()
+
 
 def km_sse_user_num_rating():
     """
@@ -275,6 +277,15 @@ def plot_num_rating():
     fig, ax = plt.subplots()
     ax.scatter(num_rating[:100], np.zeros_like(
         num_rating[:100]), c=rating_cluster[:100])
+    plt.show()
+
+
+def visualize_2d(x, y, x_label, y_label, title):
+    fig, ax = plt.subplots()
+    ax.scatter(x, y)
+    plt.ylabel(y_label)
+    plt.xlabel(x_label)
+    plt.title(title)
     plt.show()
 
 

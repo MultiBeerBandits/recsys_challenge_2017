@@ -5,23 +5,22 @@ import numpy as np
 import numpy.linalg as LA
 import scipy.sparse.linalg as sLA
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
-from src.FWUM.UICF import xSquared
-from src.CBF.CBF import ContentBasedFiltering
-from src.UBF.UBF import UserBasedFiltering
 from src.utils.cluster import build_user_cluster
-from src.MF.iALS import IALS
+
 
 
 class Ensemble(object):
 
-    def __init__(self):
+    def __init__(self, models, normalize_ratings=False):
+        """
+        models is a list of recommender models implementing fit
+        each model should implement BaseRecommender class
+        """
         self.dataset = None
-        self.xbf = xSquared()
-        self.cbf = ContentBasedFiltering()
-        self.ubf = UserBasedFiltering()
-        self.ials = None
+        self.models = models
+        self.normalize_ratings = normalize_ratings
 
-    def mix(self, models, params, normalize_ratings=False):
+    def mix(self, params):
         """
         takes an array of models all with R_hat as atttribute
         and mixes them using params
@@ -29,11 +28,11 @@ class Ensemble(object):
         """
         R_hat_mixed = lil_matrix(
             (models[0].R_hat.shape[0], models[0].R_hat.shape[1]))
-        for i in range(len(models)):
-            if normalize_ratings:
-                current_r_hat = self.max_normalize(models[i].R_hat)
+        for i in range(len(self.models)):
+            if self.normalize_ratings:
+                current_r_hat = self.max_normalize(self.models[i].R_hat)
             else:
-                current_r_hat = models[i].R_hat
+                current_r_hat = self.models[i].R_hat
             R_hat_mixed += current_r_hat.multiply(params[i])
         return R_hat_mixed.tocsr()
 
@@ -77,8 +76,7 @@ class Ensemble(object):
 
     def predict(self, params, at=5):
         # Mix them all
-        models = [self.xbf, self.cbf, self.ubf, self.ials]
-        R_hat = self.mix(models, params, normalize_ratings=False)
+        R_hat = self.mix(params)
         """
         returns a dictionary of
         'pl_id': ['tr_1', 'tr_at'] for each playlist in target playlist
@@ -102,11 +100,10 @@ class Ensemble(object):
         """
         self.tr_id_list = tg_tracks
         self.pl_id_list = tg_playlist
-        self.ials = IALS(urm.copy(), 500, 50, 1e-4, 800)
-        self.xbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        self.cbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        self.ubf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        self.ials.fit(tg_playlist, tg_tracks, ds)
+
+        # call fit on all models
+        for model in self.models:
+            model.fit(urm.copy(), tg_playlist, tg_tracks, ds)
 
     def fit_cluster(self, params):
         ds = Dataset(load_tags=True, filter_tag=True)

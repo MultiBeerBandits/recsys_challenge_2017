@@ -4,9 +4,10 @@ import numpy as np
 from src.utils.loader import *
 from src.utils.evaluator import *
 from src.utils.matrix_utils import top_k_filtering
+from src.utils.BaseRecommender import BaseRecommender
 
 
-class IALS():
+class IALS(BaseRecommender):
     """Results:
     0,027 with 100, 50, 1e-6, 40
     0,033 with 100, 50, 1e-4, 400
@@ -17,7 +18,7 @@ class IALS():
     0.069 with 500, 70. 1e-4, 800
     """
 
-    def __init__(self, urm, features, learning_steps, reg, confidence):
+    def __init__(self, features, learning_steps, reg, confidence):
         # Number of latent factors
         self.features = features
 
@@ -25,7 +26,7 @@ class IALS():
         self.learning_steps = learning_steps
 
         # Store a reference to URM
-        self.urm = urm
+        self.urm = None
 
         # regularization weight
         self.reg = reg
@@ -40,7 +41,8 @@ class IALS():
         self.pl_id_list = None
         self.tr_id_list = None
 
-    def fit(self, tg_playlist, tg_tracks, dataset):
+    def fit(self, urm, tg_playlist, tg_tracks, dataset):
+        self.urm = urm
         self.pl_id_list = list(tg_playlist)
         self.tr_id_list = list(tg_tracks)
         # initialize a model
@@ -81,6 +83,9 @@ class IALS():
             tracks_ids = [self.tr_id_list[x] for x in track_cols]
             recs[pl_id] = tracks_ids
         return recs
+
+    def getR_hat(self):
+        return self.R_hat
 
 
 if __name__ == '__main__':

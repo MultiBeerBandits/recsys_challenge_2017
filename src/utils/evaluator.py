@@ -1,6 +1,7 @@
 import random
 import math
 from scipy.sparse import lil_matrix
+import numpy as np
 
 
 class Evaluator(object):
@@ -140,6 +141,22 @@ class Evaluator(object):
             print("MAP@5: " + str(map_at_five))
             self.evaluations[self.current_fold_index] = map_at_five
             return map_at_five
+
+    def map_per_cluster(self, tg_playlist, clusters, n_clusters):
+        """
+        tg_playlist is a list with the ids of target playlists
+        clusters contains for each element in tg_playlist its cluster index
+        """
+        # map for each element of tg_playlist
+        maps = np.array([self.map_playlists[x] for x in tg_playlist])
+
+        # for each cluster index its avg map
+        mpc = np.zeros(n_clusters)
+
+        for i in range(n_clusters):
+            mpc[i] = np.mean(maps[clusters == i])
+
+        return mpc
 
     def print_worst(self, dataset):
         """
