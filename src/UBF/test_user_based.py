@@ -3,6 +3,7 @@ from scipy.sparse import *
 from src.utils.evaluator import *
 from src.UBF.UBF import *
 from src.utils.matrix_utils import cluster_per_n_rating
+from src.utils.plotter import visualize_2d
 
 
 def main():
@@ -17,7 +18,7 @@ def main():
             ubf = UserBasedFiltering()
             for i in range(0, 5):
                 urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-                ubf.fit(urm, tg_playlist, tg_tracks, ds, shr, k_f)
+                ubf.fit(urm, tg_playlist, tg_tracks, ds)
                 recs = ubf.predict()
                 ev.evaluate_fold(recs)
                 rating_cluster = cluster_per_n_rating(urm, tg_playlist, ds, 10)
