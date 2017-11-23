@@ -92,7 +92,7 @@ class Dataset():
         self.tags_weight = tags_w
         self.track_num_rating_weight = num_rating_weight
 
-    def set_playlist_attr_weights(self, created_at_weight, owner_weight, title_weight, duration_weight, numtracks_weight):
+    def set_playlist_attr_weights(self, created_at_weight, owner_weight, title_weight, duration_weight, numtracks_weight=1):
         self.created_at_weight = created_at_weight
         self.owner_weight = owner_weight
         self.title_weight = title_weight
