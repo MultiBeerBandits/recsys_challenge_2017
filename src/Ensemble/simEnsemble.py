@@ -67,7 +67,7 @@ class SimEnsemble():
             (len(self.pl_id_list), len(self.tr_id_list)))
         S_mixed = lil_matrix((self.similarities[0].shape[0], self.similarities[0].shape[1]))
         for i in range(len(self.similarities)):
-            S_mixed += similarities[i].multiply(params[i])
+            S_mixed += self.similarities[i].multiply(params[i])
         # normalize S_mixed
         s_norm = S_mixed.sum(axis=1)
         # normalize s

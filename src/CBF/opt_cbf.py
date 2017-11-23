@@ -6,6 +6,7 @@ from scipy.sparse import *
 from src.ML.CSLIM_parallel import *
 from src.utils.loader import *
 from src.utils.evaluator import *
+import numpy as np
 from src.CBF.CBF_augmented import ContentBasedFiltering
 # Logging stuff
 import logging
@@ -18,7 +19,11 @@ logging.basicConfig(filename='ensemble.log',
 
 
 def objective(params):
+    params = np.array(params)
+    params[params < 0] = 0
+    params = list(params)
     artist, album, duration_tracks, playcount, tags, n_rating, created_at, owner, title, duration_playlist = params
+
     print("Current params", str(params))
     # get the current fold
     ds = Dataset(load_tags=True, filter_tag=True)
