@@ -9,6 +9,7 @@ from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.BaseRecommender import BaseRecommender
 
 
+
 class UserBasedFiltering(BaseRecommender):
 
     """

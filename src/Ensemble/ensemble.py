@@ -6,6 +6,11 @@ import numpy.linalg as LA
 import scipy.sparse.linalg as sLA
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.cluster import build_user_cluster
+from src.Pop.popularity import Popularity
+from src.FWUM.UICF import xSquared
+from src.CBF.CBF import ContentBasedFiltering
+from src.UBF.UBF import UserBasedFiltering
+from src.MF.iALS import IALS
 
 
 
