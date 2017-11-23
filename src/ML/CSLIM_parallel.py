@@ -8,9 +8,10 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.preprocessing import normalize
 from src.utils.loader import *
 from src.utils.evaluator import *
+from src.utils.BaseRecommender import BaseRecommender
 
 
-class SLIM():
+class SLIM(BaseRecommender):
     """docstring for SLIM"""
 
     def __init__(self, l1_reg=1e-5, l2_reg=1e-6, feature_reg=4):
@@ -36,46 +37,32 @@ class SLIM():
         self.tr_id_list = None
         self.dataset = None
 
-    def fit(self, urm, target_items, target_users, dataset, test_dict=None):
+    def fit(self, urm, tg_playlist, tg_tracks, dataset):
         # Store target playlists and tracks
-        self.pl_id_list = list(target_users)
-        self.tr_id_list = list(target_items)
+        self.pl_id_list = list(tg_playlist)
+        self.tr_id_list = list(tg_tracks)
 
         # store dataset
         self.dataset = dataset
 
-        # Set ICM weights
-        dataset.set_track_attr_weights(art_w=1,
-                                       alb_w=0.9,
-                                       dur_w=0.2,
-                                       playcount_w=0.2,
-                                       tags_w=0.2)
         # Use the iucm
-        # dataset.set_playlist_attr_weights(0.01, 0.01, 0.01)
         icm = dataset.build_icm()
-        # icm = dataset.add_playlist_attr_to_icm(icm, test_dict)
         # weight icm
         icm = icm * np.sqrt(self.feature_reg)
-        # Apply tf idf
-        # transformer = TfidfTransformer()
-        # icm = transformer.fit_transform(icm.transpose()).transpose()
-        # icm = normalize(icm, axis=0)
+
         # Build training matrix
         M = vstack([urm, icm]).tocsc()
 
         model = ElasticNet(alpha=self.alpha,
                            fit_intercept=False,
                            l1_ratio=self.l1_ratio,
-                           positive=True,
-                           tol=1e-6,
-                           selection='random',
-                           max_iter=5000)
+                           positive=True)
 
         # LET's PARALLEL!!!
         # First we get a sorted list of target items column indices.
         #   We want them sorted to improve data locality.
         target_indeces = sorted([dataset.get_track_index_from_id(x)
-                                 for x in target_items])
+                                 for x in self.tr_id_list])
 
         # Then we split the target items indices into chunks to ship
         # to pool workers.
@@ -129,7 +116,7 @@ class SLIM():
 
         # Keep only target_item columns
         self.R_hat = self.R_hat[:, [dataset.get_track_index_from_id(x)
-                                    for x in target_items]]
+                                    for x in self.tr_id_list]]
 
     def predict(self, at=5):
         """
@@ -154,6 +141,9 @@ class SLIM():
         Returns the similary matrix with dimensions I x I
         """
         return self.W
+
+    def getR_hat(self):
+        return self.R_hat
 
 
 def _work(params):

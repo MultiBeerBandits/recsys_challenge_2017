@@ -12,6 +12,7 @@ from src.UBF.UBF import UserBasedFiltering
 from src.MF.iALS import IALS
 from src.SLIM_BPR.Cython.SLIM_BPR_Cython import SLIM_BPR_Cython
 from src.Pop.popularity import Popularity
+from src.ML.CSLIM_parallel import SLIM
 # Logging stuff
 import logging
 
@@ -83,14 +84,23 @@ def linear_ensemble():
     space = [Real(0.0, 1.0),  # XBF
              Real(0.0, 1.0),  # CBF
              Real(0.0, 1.0),  # UBF
-             Real(0.0, 1.0),  # IALS
-             Real(0.0, 1.0)
+             # Real(0.0, 1.0),  # IALS
+             Real(0.0, 1.0),  # CSLIM
+             Real(0.0, 1.0),  # Pop
              ]
+    # x0 = [1, 0, 0, 0, 0, 0]
+    # x1 = [0, 1, 0, 0, 0, 0]
+    # x2 = [0, 0, 1, 0, 0, 0]
+    # x3 = [0, 0, 0, 1, 0, 0]
+    # x4 = [0, 0, 0, 0, 1, 0]
+    # x5 = [0, 0, 0, 0, 0, 1]
+
     x0 = [1, 0, 0, 0, 0]
     x1 = [0, 1, 0, 0, 0]
     x2 = [0, 0, 1, 0, 0]
     x3 = [0, 0, 0, 1, 0]
     x4 = [0, 0, 0, 0, 1]
+
     x0s = [x0, x1, x2, x3, x4]
     # get the current fold
     ds = Dataset(load_tags=True, filter_tag=True)
@@ -103,13 +113,14 @@ def linear_ensemble():
     # create all the models
     cbf = ContentBasedFiltering()
     xbf = xSquared()
-    ials = IALS(500, 50, 1e-4, 800)
+    # ials = IALS(500, 50, 1e-4, 800)
     ubf = UserBasedFiltering()
     # bpr_cslim = create_BPR_SLIM(urm, ds)
     pop = Popularity()
+    cslim = SLIM()
 
     # add models to list of models
-    models = [xbf, cbf, ubf, ials, pop]
+    models = [cslim, xbf, cbf, ubf, pop]
 
     # create the ensemble
     ensemble = Ensemble(models)
@@ -123,14 +134,14 @@ def linear_ensemble():
                           x0=x0s,
                           verbose=True,
                           n_random_starts=20,
-                          n_calls=200,
+                          n_calls=300,
                           n_jobs=-1,
                           callback=result)
 
     # print optimal params
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
-    params = ['XBF', 'CBF', 'UBF', 'IALS']
+    params = ['CSLIM', 'XBF', 'CBF', 'UBF', 'POP']
     for (p, x_) in zip(params, res.x):
         print('{}: {}'.format(p, x_))
 
@@ -138,7 +149,7 @@ def opt_sim_ensemble():
     global sim_ensemble, ev
     space = [Real(0.0, 1.0),  # CBF
              Real(0.0, 1.0),  # IBF
-             Real(0.0, 1.0),  # IALS
+             Real(0.0, 1.0),  # CSLIM
              ]
     x0 = [1, 0, 0]
     x1 = [0, 1, 0]
@@ -155,7 +166,7 @@ def opt_sim_ensemble():
     res = forest_minimize(sim_objective, space, x0=x0s, verbose=True, n_random_starts=20, n_calls=200, n_jobs=-1, callback=result)
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
-    params = ['XBF', 'CBF', 'UBF', 'IALS']
+    params = ['CBF', 'IBF', 'CSLIM']
     for (p, x_) in zip(params, res.x):
         print('{}: {}'.format(p, x_))
 
@@ -176,4 +187,4 @@ def cluster_ensemble():
         print('{}: {}'.format(p, x_))
 
 if __name__ == '__main__':
-    linear_ensemble()
+    opt_sim_ensemble()
