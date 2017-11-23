@@ -13,7 +13,7 @@ from src.utils.evaluator import *
 class SLIM():
     """docstring for SLIM"""
 
-    def __init__(self, l1_reg=1e-5, l2_reg=1e-6, feature_reg=2):
+    def __init__(self, l1_reg=1e-5, l2_reg=1e-6, feature_reg=4):
         """
         On 2017-10-22 we scored 0.081887527481395 with
             l1_reg=0.00001,
@@ -51,7 +51,7 @@ class SLIM():
                                        playcount_w=0.2,
                                        tags_w=0.2)
         # Use the iucm
-        dataset.set_playlist_attr_weights(0.01, 0.01, 0.01)
+        # dataset.set_playlist_attr_weights(0.01, 0.01, 0.01)
         icm = dataset.build_icm()
         # icm = dataset.add_playlist_attr_to_icm(icm, test_dict)
         # weight icm
@@ -66,7 +66,10 @@ class SLIM():
         model = ElasticNet(alpha=self.alpha,
                            fit_intercept=False,
                            l1_ratio=self.l1_ratio,
-                           positive=True)
+                           positive=True,
+                           tol=1e-6,
+                           selection='random',
+                           max_iter=5000)
 
         # LET's PARALLEL!!!
         # First we get a sorted list of target items column indices.
