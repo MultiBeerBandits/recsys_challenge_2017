@@ -32,6 +32,7 @@ class SimEnsemble():
         self.pl_id_list = list(tg_playlist)
         self.tr_id_list = list(tg_tracks)
         self.dataset = dataset
+        self.urm = urm
 
         # Build slim similarity
         slim = SLIM()
@@ -63,6 +64,7 @@ class SimEnsemble():
         and mixes them using params
         params: array of attributes
         """
+        urm = self.urm
         R_hat_mixed = lil_matrix(
             (len(self.pl_id_list), len(self.tr_id_list)))
         S_mixed = lil_matrix((self.similarities[0].shape[0], self.similarities[0].shape[1]))
