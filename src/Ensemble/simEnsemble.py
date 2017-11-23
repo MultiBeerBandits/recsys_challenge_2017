@@ -32,9 +32,15 @@ class SimEnsemble():
         self.pl_id_list = list(tg_playlist)
         self.tr_id_list = list(tg_tracks)
         self.dataset = dataset
+
+        # Build slim similarity
+        slim = SLIM()
+        slim.fit(urm, self.pl_id_list, self.tr_id_list, dataset)
+        S_cslim = slim.getW()
+        S_cslim = S_cslim[:, [dataset.get_track_index_from_id(x) for x in self.tr_id_list]].transpose()
+
         # Build content based similarity
         icm = dataset.build_icm()
-
         S_cbf = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], icm, k_filtering=200, shrinkage=10)
 
         # Build collaborative similarity
@@ -45,9 +51,6 @@ class SimEnsemble():
         # ials.fit(urm, tg_playlist, tg_tracks, dataset)
         # item_factors = ials.model.item_factors
         # S_ials = compute_cosine(item_factors[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], item_factors.transpose(), k_filtering=200, shrinkage=10)
-
-        S_cslim = SLIM().fit(urm, self.pl_id_list, self.tr_id_list, dataset).getW()
-        S_cslim = S_cslim[:, [dataset.get_track_index_from_id(x) for x in self.tr_id_list]].transpose()
 
         # append all similarities
         self.similarities.append(S_cbf)

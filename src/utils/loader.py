@@ -161,7 +161,7 @@ class Dataset():
                         playcount_offset
                     icm[playcount_index, track_index] = self.playcount_weight
                     playcount_index += 1
-        return icm
+        return csr_matrix(icm)
 
     def build_iucm(self, test_dict, path='./data/playlists_final'):
         """
@@ -246,11 +246,7 @@ class Dataset():
                 ucm[owner_index, pl_index] = self.owner_weight
                 for title_index in title_index_array:
                     ucm[title_index, pl_index] = self.title_weight
-        # apply tfidf
-        # tfidftransform = TfidfTransformer()
-        # icm = tfidftransform.fit_transform(iucm.transpose()).transpose()
-        # scale all values
-        return ucm
+        return csr_matrix(ucm)
 
     def build_tags_matrix(self, path='./data/tracks_final.csv'):
         """
