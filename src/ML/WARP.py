@@ -16,7 +16,7 @@ class WARP():
         self.icm_t = None
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=5, item_alpha=1e-9, l_rate=5e-3):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=1000, n_epochs=5, item_alpha=1e-4, l_rate=5e-2):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         if self.model is None:
@@ -55,7 +55,7 @@ class WARP():
             R_hat[cont] = self.model.predict(
                  u_index, tr_indices, num_threads=4, item_features=self.icm_t)
             if cont % 1000 == 0:
-                print("Done: ", cont)
+                print("Done: ", cont, flush=True)
             cont += 1
         self.R_hat = csr_matrix(R_hat)
 
