@@ -53,8 +53,8 @@ class RCSLIM(BaseRecommender):
 
         for i in range(50):
             id = eye(self.S.shape[0])
-            self.Q = solve_alternating(self.icm, self.S, self.icm, id, self.Q, model, self.feature_reg, self.beta1)
-            self.S = solve_alternating(self.urm, self.Q, self.urm, id, self.S, model, 1, self.beta1)
+            self.Q = self.solve_alternating(self.icm, self.S, self.icm, id, self.Q, model, self.feature_reg, self.beta1)
+            self.S = self.solve_alternating(self.urm, self.Q, self.urm, id, self.S, model, 1, self.beta1)
 
         # clean urm from unwanted users
         urm = urm[[dataset.get_playlist_index_from_id(x)

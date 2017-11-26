@@ -21,7 +21,7 @@ class MF_BPR():
             self.runCompilationScript()
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=300, n_epochs=5, user_reg=1e-1, item_reg=1e-2, l_rate=1e-2, epoch_multiplier=2):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=300, n_epochs=5, user_reg=1e-1, item_reg=1e-2, l_rate=5e-2, epoch_multiplier=5):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         self.eligibleUsers = []
@@ -43,7 +43,7 @@ class MF_BPR():
 
         if self.cythonEpoch is None:
             from src.MF.MF_BPR.MF_BPR_Cython_Epoch import MF_BPR_Cython_Epoch
-            self.cythonEpoch = MF_BPR_Cython_Epoch(urm_ext,
+            self.cythonEpoch = MF_BPR_Cython_Epoch(urm_,
                                                    self.eligibleUsers,
                                                    num_factors=no_components,
                                                    learning_rate=l_rate,
