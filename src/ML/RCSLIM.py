@@ -48,8 +48,8 @@ class RCSLIM(BaseRecommender):
         # model for solving with S
         model = SGDRegressor(penalty='elasticnet',
                              fit_intercept=False,
-                             alpha=alpha,
-                             l1_ratio=l1_ratio)
+                             alpha=self.alpha,
+                             l1_ratio=self.l1_ratio)
 
         for i in range(iterations):
             id = eye(self.S.shape[0])

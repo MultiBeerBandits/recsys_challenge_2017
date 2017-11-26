@@ -26,12 +26,14 @@ class MF_BPR():
         self.tr_id_list = tg_tracks
         self.eligibleUsers = []
         urm = urm.tocsr()
-        for user_id in range(urm.shape[0]):
+        icm = dataset.build_icm()
+        urm_ext = vstack([urm, icm], format='csr')
+        for user_id in range(urm_ext.shape[0]):
 
-            start_pos = urm.indptr[user_id]
-            end_pos = urm.indptr[user_id + 1]
+            start_pos = urm_ext.indptr[user_id]
+            end_pos = urm_ext.indptr[user_id + 1]
 
-            numUserInteractions = len(urm.indices[start_pos:end_pos])
+            numUserInteractions = len(urm_ext.indices[start_pos:end_pos])
 
             if numUserInteractions > 0:
                 self.eligibleUsers.append(user_id)
@@ -41,7 +43,7 @@ class MF_BPR():
 
         if self.cythonEpoch is None:
             from src.MF.MF_BPR.MF_BPR_Cython_Epoch import MF_BPR_Cython_Epoch
-            self.cythonEpoch = MF_BPR_Cython_Epoch(urm.tocsr(),
+            self.cythonEpoch = MF_BPR_Cython_Epoch(urm_ext,
                                                    self.eligibleUsers,
                                                    num_factors=no_components,
                                                    learning_rate=l_rate,
