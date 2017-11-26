@@ -176,7 +176,7 @@ class RCSLIM(BaseRecommender):
         #   - The ElasticNet model
         separated_tasks = []
         for ti in chunks:
-            separated_tasks.append([ti, Y, X, W, model])
+            separated_tasks.append([ti, Y, X, init_matrix, model])
 
         start = time.time()
 

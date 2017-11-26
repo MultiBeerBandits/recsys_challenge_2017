@@ -71,7 +71,7 @@ class MF_BPR():
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
 
         self.R_hat[urm_cleaned.nonzero()] = 0
-        self.R_hat.eliminate_zeros()
+        self.R_hat = csr_matrix(self.R_hat)
         self.R_hat = csr_matrix(top_k_filtering(self.R_hat, 10))
         print("R_hat done")
 
