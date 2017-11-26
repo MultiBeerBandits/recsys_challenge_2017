@@ -43,7 +43,7 @@ class MF_BPR():
 
         if self.cythonEpoch is None:
             from src.MF.MF_BPR.MF_BPR_Cython_Epoch import MF_BPR_Cython_Epoch
-            self.cythonEpoch = MF_BPR_Cython_Epoch(urm_,
+            self.cythonEpoch = MF_BPR_Cython_Epoch(urm_ext,
                                                    self.eligibleUsers,
                                                    num_factors=no_components,
                                                    learning_rate=l_rate,
@@ -66,13 +66,13 @@ class MF_BPR():
         # IxF
         H = self.cythonEpoch.get_H()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
         self.R_hat = np.dot(W, H.transpose())
-        self.R_hat = csr_matrix(top_k_filtering(self.R_hat, 10))
 
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
 
         self.R_hat[urm_cleaned.nonzero()] = 0
         self.R_hat.eliminate_zeros()
+        self.R_hat = csr_matrix(top_k_filtering(self.R_hat, 10))
         print("R_hat done")
 
     def predict(self, at=5):

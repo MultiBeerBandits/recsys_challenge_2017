@@ -44,6 +44,9 @@ class RCSLIM(BaseRecommender):
         # side effect: save S
         self.solve_cslim()
 
+        # Initialization of Q
+        self.Q = lil_matrix((self.S.shape[0], self.S.shape[1])).tocsr()
+
         # start alternating solving
         # model for solving with S
         model = SGDRegressor(penalty='elasticnet',
