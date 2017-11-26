@@ -242,21 +242,21 @@ def _work_alt(params):
     target_indeces = params[0]
     Y = csc_matrix(params[1])
     X = csc_matrix(params[2])
-    W = csc_matrix(params[3])
+    init_matrix = csc_matrix(params[3])
     model = params[4]
     count = 0
     pid = os.getpid()
 
-    W = lil_matrix((M.shape[1], M.shape[1]))
+    W = lil_matrix((X.shape[1], X.shape[1]))
     for t in target_indeces:
         if count % 100 == 0:
             print('[', pid, ']', count, '/',
                   len(target_indeces), 'ElasticNet trained...')
         # Zero-out the t-th column to meet the w_tt = 0 constraint
         r_t = Y.getcol(t).toarray().ravel()
-        X.data[M.indptr[t]:M.indptr[t + 1]] = 0
+        X.data[X.indptr[t]:X.indptr[t + 1]] = 0
         # Initial coeffs of the regression
-        coef_init = W.getcol(t).toarray().ravel()
+        coef_init = init_matrix.getcol(t).toarray().ravel()
         # Fit
         model.fit(X, r_t, coef_init=coef_init)
         # restore matrix
