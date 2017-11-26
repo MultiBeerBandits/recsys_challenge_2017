@@ -51,7 +51,7 @@ class RCSLIM(BaseRecommender):
                              alpha=self.alpha,
                              l1_ratio=self.l1_ratio)
 
-        for i in range(iterations):
+        for i in range(50):
             id = eye(self.S.shape[0])
             self.Q = solve_alternating(self.icm, self.S, self.icm, id, self.Q, model, self.feature_reg, self.beta1)
             self.S = solve_alternating(self.urm, self.Q, self.urm, id, self.S, model, 1, self.beta1)

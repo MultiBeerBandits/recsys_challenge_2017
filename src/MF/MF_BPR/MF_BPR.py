@@ -21,7 +21,7 @@ class MF_BPR():
             self.runCompilationScript()
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=300, n_epochs=5, user_reg=1e-1, item_reg=1e-2, l_rate=1e-1, epoch_multiplier=5):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=300, n_epochs=5, user_reg=1e-1, item_reg=1e-2, l_rate=1e-2, epoch_multiplier=2):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         self.eligibleUsers = []
