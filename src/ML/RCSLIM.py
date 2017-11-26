@@ -263,7 +263,7 @@ def _work_alt(params):
         X[:, t] = csc_matrix(r_t).transpose()
 
         # Build a W matrix with column indeces from 0 to to_col - from_col
-        W[:, t] = model.sparse_coef_.transpose()
+        W[:, t] = csr_matrix(model.coef_).transpose()
         count += 1
     return W
 
