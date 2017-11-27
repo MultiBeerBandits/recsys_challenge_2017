@@ -2,8 +2,10 @@ from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
 import numpy as np
-from src.CBF.CBF import *
+from src.CBF.CBF_4 import *
 from itertools import product
+from src.utils.plotter import visualize_2d
+from src.utils.matrix_utils import cluster_per_n_rating
 
 
 def main():
@@ -13,19 +15,19 @@ def main():
     # shr_w = 100
     # k_f = 50
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 0.9, 0.2, 0.2, 0.2)
-    ds.set_playlist_attr_weights(0.5, 0.7, 0.7, 0.4, 0.4)
+    ds.set_track_attr_weights(1, 0, 1, 1, 1, 1, 1)
+    ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        test_dict = ev.get_test_dict(i)
         cbf.fit(urm, tg_playlist,
                 tg_tracks,
-                ds, test_dict=test_dict)
+                ds)
         recs = cbf.predict()
         ev.evaluate_fold(recs)
+
     map_at_five = ev.get_mean_map()
     print("MAP@5 ", map_at_five)
 
