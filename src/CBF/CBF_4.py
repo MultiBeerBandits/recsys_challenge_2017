@@ -69,7 +69,7 @@ class ContentBasedFiltering():
         R_hat[urm.nonzero()] = 0
         R_hat.eliminate_zeros()
 
-        R_hat = top_k_filtering(R_hat, 10)
+        R_hat = top_k_filtering(R_hat, 20)
 
         # re add initial ratings
         R_hat[urm.nonzero()] = 1
