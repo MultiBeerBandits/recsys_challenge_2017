@@ -79,7 +79,7 @@ class ContentBasedFiltering():
         R_hat = R_hat + urm
 
         # do collaborative filtering
-        S_cf = compute_cosine(R_hat.transpose()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], R_hat, k_filtering=k_filtering, shrinkage=self.shrinkage)
+        S_cf = compute_cosine(R_hat.transpose()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], R_hat, k_filtering=k_filtering, shrinkage=shrinkage)
 
         # normalize
         S_cf = normalize_by_row(S_cf)
