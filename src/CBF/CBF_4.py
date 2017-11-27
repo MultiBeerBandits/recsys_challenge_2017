@@ -89,7 +89,7 @@ class ContentBasedFiltering():
         self.R_hat.eliminate_zeros()
 
         print("R_hat done")
-        self.R_hat = csr_matrix(R_hat)
+        self.R_hat = csr_matrix(self.R_hat)
 
         print(self.R_hat.shape, len(self.pl_id_list), len(self.tr_id_list))
 
