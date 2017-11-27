@@ -72,7 +72,7 @@ class ContentBasedFiltering():
         R_hat = top_k_filtering(R_hat, 10)
 
         # re add initial ratings
-        R_hat = R_hat + urm
+        R_hat[urm.nonzero()] = 1
 
         # do collaborative filtering
         S_cf = compute_cosine(R_hat.transpose()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], R_hat, k_filtering=k_filtering, shrinkage=shrinkage)
@@ -80,7 +80,7 @@ class ContentBasedFiltering():
         # normalize
         S_cf = normalize_by_row(S_cf)
 
-        self.R_hat = urm[[dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S_cf.transpose())
+        self.R_hat = csr_matrix(urm[[dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S_cf.transpose()))
 
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
@@ -90,6 +90,8 @@ class ContentBasedFiltering():
 
         print("R_hat done")
         self.R_hat = csr_matrix(R_hat)
+
+        print(self.R_hat.shape, len(self.pl_id_list), len(self.tr_id_list))
 
     def getW(self):
         """
