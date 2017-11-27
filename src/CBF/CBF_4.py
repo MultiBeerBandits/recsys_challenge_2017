@@ -59,10 +59,6 @@ class ContentBasedFiltering():
         s_norm = S.sum(axis=1)
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
 
-        # keep only target rows of URM and target columns
-        urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
-                           for x in self.pl_id_list]]
-
         # save S
         self.S = S.transpose()
 
@@ -93,7 +89,7 @@ class ContentBasedFiltering():
         self.R_hat.eliminate_zeros()
 
         print("R_hat done")
-        self.R_hat = R_hat
+        self.R_hat = csr_matrix(R_hat)
 
     def getW(self):
         """
