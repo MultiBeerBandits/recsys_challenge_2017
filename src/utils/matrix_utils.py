@@ -27,15 +27,57 @@ def top_k_filtering(matrix, topK):
 
 
 def cluster_per_n_rating(urm, tg_playlist, ds, n_cluster):
-    urm = urm[[ds.get_playlist_index_from_id(x) for x in tg_playlist]]
     n_rating = urm.sum(axis=1)
     rating_cluster = KMeans(n_clusters=n_cluster).fit_predict(n_rating)
+
+    # keep only tg users
+    rating_cluster = rating_cluster[[ds.get_playlist_index_from_id(x) for x in tg_playlist]]
+
     return rating_cluster
 
+
 def cluster_per_ucm(urm, tg_playlist, ds, n_cluster):
-    ucm = ds.build_ucm()
-    ucm = ucm[:, [ds.get_playlist_index_from_id(x) for x in tg_playlist]].transpose()
+    icm = ds.build_icm()
+    ucm = ds.build_ucm().transpose()
+
+    # get uicm: Users x Features
+    uicm = urm.dot(icm.transpose())
+
+    # Normalize UICM
+    n_ratings = urm.sum(axis=1)
+    n_ratings [n_ratings == 0] = 1
+    n_ratings.data = np.reciprocal(n_ratings.data)
+    uicm = uicm.multiply(n_ratings)
+
+    # Stack uicm ucm on uicm
+    ucm = sps.hstack([ucm, uicm], format='csr')
+
     ucm_cluster = KMeans(n_clusters=n_cluster).fit_predict(ucm)
+
+    # keep only tg users
+    ucm_cluster = ucm_cluster[[ds.get_playlist_index_from_id(x) for x in tg_playlist]]
+
+    return ucm_cluster
+
+
+def cluster_per_uicm(urm, tg_playlist, ds, n_cluster):
+
+    icm = ds.build_icm()
+
+    # get uicm: Users x Features
+    uicm = urm.dot(icm.transpose())
+
+    # Normalize UICM
+    n_ratings = urm.sum(axis=1)
+    n_ratings[n_ratings == 0] = 1
+    n_ratings.data = np.reciprocal(n_ratings.data)
+    uicm = uicm.multiply(n_ratings)
+
+    ucm_cluster = KMeans(n_clusters=n_cluster).fit_predict(uicm)
+
+    # keep only tg users
+    ucm_cluster = ucm_cluster[[ds.get_playlist_index_from_id(x) for x in tg_playlist]]
+
     return ucm_cluster
 
 
