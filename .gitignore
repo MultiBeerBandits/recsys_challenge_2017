@@ -114,3 +114,7 @@ ENV/
 # Useless dirs
 armadillo*/
 eigen-*/
+
+# Cython builds
+*_Cython_*.html
+*_Cython_*.c
