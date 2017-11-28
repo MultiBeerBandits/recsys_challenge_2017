@@ -41,7 +41,7 @@ class ContentBasedFiltering(BaseRecommender):
         S = None
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm()
+        icm = dataset.build_icm_2()
         # icm = self.applytfidf(icm)
         icm = dataset.add_playlist_to_icm(icm, urm, 0.5)
         print("SHAPE of ICM: ", icm.shape)
