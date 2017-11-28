@@ -6,12 +6,12 @@ import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
-from src.utils.BaseRecommender import BaseRecommender
 
 
-class ContentBasedFiltering(BaseRecommender):
+class ContentBasedFiltering():
+    # The prediction is done S_user*(1-alfa) + S_cbf(alfa)
 
-    def __init__(self, shrinkage=50, k_filtering=200):
+    def __init__(self, alfa):
         # final matrix of predictions
         self.R_hat = None
 
@@ -20,10 +20,11 @@ class ContentBasedFiltering(BaseRecommender):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-        self.shrinkage = shrinkage
-        self.k_filtering = k_filtering
+        # save alfa value
+        self.alfa = alfa
 
-    def fit(self, urm, target_playlist, target_tracks, dataset):
+
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -33,6 +34,7 @@ class ContentBasedFiltering(BaseRecommender):
         R = URM S
         In between eliminate useless row of URM and useless cols of S
         """
+
         # initialization
 
         self.pl_id_list = list(target_playlist)
@@ -40,41 +42,76 @@ class ContentBasedFiltering(BaseRecommender):
         self.dataset = dataset
         S = None
         print("CBF started")
-        # get ICM from dataset, assume it already cleaned
+
+        # get ICM from dataset
         icm = dataset.build_icm()
-        # icm = self.applytfidf(icm)
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.5)
-        print("SHAPE of ICM: ", icm.shape)
+
+        # add urm
+        icm = dataset.add_playlist_to_icm(icm, urm, 0.4)
+
+        # add n_ratings to icm
+        icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
+
+        # build user content matrix
+        ucm = dataset.build_ucm()
+
+        # build item user-feature matrix: UFxI
+        iucm = ucm.dot(urm)
+
+        iucm_norm = urm.sum(axis=0)
+        iucm_norm[iucm_norm == 0] = 1
+        iucm_norm = np.reciprocal(iucm_norm)
+        iucm = csr_matrix(iucm.multiply(iucm_norm))
+
+        S_user = compute_cosine(iucm.transpose()[[dataset.get_track_index_from_id(x)
+                                                  for x in self.tr_id_list]],
+                                iucm, k_filtering=k_filtering, shrinkage=shrinkage)
+
+        # To filter or not to filter? Who knows?
+
+        # title = dataset.build_title_matrix(iucm)
+        # title = top_k_filtering(title.transpose(), topK=100)
+        # title.data = np.ones_like(title.data)
+        # title = title.multiply(0.05)
+        # # owner = dataset.build_owner_matrix(iucm)
+        # # owner = top_k_filtering(owner.transpose(), topK=500)
+        # # owner.data = np.ones_like(owner.data)
+        # # owner = owner.multiply(0.05)
+        # created_at = dataset.build_created_at_matrix(iucm)
+        # print(created_at.shape)
+        # created_at = top_k_filtering(created_at.transpose(), topK=10)
+        # created_at.data = np.ones_like(created_at.data)
+        # created_at = created_at.multiply(0.01)
+
+        # compute cosine similarity (only for tg tracks) wrt to all tracks
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
                                             for x in self.tr_id_list]],
-                           icm,
-                           k_filtering=self.k_filtering,
-                           shrinkage=self.shrinkage)
+                           icm, k_filtering=k_filtering, shrinkage=shrinkage)
+
+        # compute a weighted average
+        S = S.multiply(self.alfa) + S_user.multiply(1 - self.alfa)
+
+        # Normalize S
         s_norm = S.sum(axis=1)
-        # normalize s
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
-        # compute ratings
-        print("Similarity matrix ready!")
+
+        # keep only target rows of URM and target columns
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
-        # s_norm = S.sum(axis=1)
-        # normalize s
-        # S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+
+        # save S
         self.S = S.transpose()
+
         # compute ratings
-        R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
-        # eliminate useless columns
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(x)
-                                      # for x in self.tr_id_list]]
-        print("R_hat done")
+        R_hat = urm_cleaned.dot(S.transpose()).tocsr()
+
+        # apply mask for eliminating already rated items
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
                                       for x in self.tr_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
-        # eliminate playlist that are not target, already done, to check
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(
-        #    x) for x in self.tr_id_list]]
-        print("Shape of final matrix: ", R_hat.shape)
+
+        print("R_hat done")
         self.R_hat = R_hat
 
     def getW(self):
@@ -101,10 +138,6 @@ class ContentBasedFiltering(BaseRecommender):
             tracks_ids = [self.tr_id_list[x] for x in track_cols]
             recs[pl_id] = tracks_ids
         return recs
-
-    def getR_hat(self):
-        return self.R_hat
-
 
     def get_model(self):
         """

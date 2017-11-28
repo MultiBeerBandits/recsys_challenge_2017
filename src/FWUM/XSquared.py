@@ -3,9 +3,10 @@ from scipy.sparse import *
 import numpy as np
 import numpy.linalg as LA
 from sklearn.decomposition import TruncatedSVD
+from src.utils.BaseRecommender import BaseRecommender
 
-
-class xSquared():
+# MAP 0.08440398099977366
+class xSquared(BaseRecommender):
     """
     Rationale:
     build a user feature matrix:
@@ -27,7 +28,7 @@ class xSquared():
     Idea: two user are similar if the like items with similar features
     """
 
-    def __init__(self):
+    def __init__(self, k_similar=500):
         self.pl_id_list = []
         self.tr_id_list = []
         self.ufm = None
@@ -35,8 +36,9 @@ class xSquared():
         self.urm = None
         self.dataset = None
         self.R_hat = None
+        self.k_similar = k_similar
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, k_feature=500, k_similar=500):
+    def fit(self, urm, target_playlist, target_tracks, dataset):
         # initialization
         self.pl_id_list = list(target_playlist)
         self.tr_id_list = list(target_tracks)
@@ -68,21 +70,6 @@ class xSquared():
         ufm = np.multiply(ufm, Iu)
         self.ufm = ufm
         print("User feature matrix built done")
-        # Feature weighting step
-        # put to one each element in ufm
-        # ufm_ones = ufm.copy()
-        # ufm_ones[ufm.nonzero()] = 1
-        # # first build IUF(f)
-        # uf = ufm_ones.sum(axis=0)
-        # uf_copy = uf.copy()
-        # uf_copy[uf_copy == 0] = 1
-        # iuf = np.reciprocal(uf_copy)
-        # iuf[uf == 0] = 0
-        # iuf = csr_matrix(iuf)
-        # iuf.data = float(dataset.playlists_number) * iuf.data
-        # iuf.data = np.log(iuf.data)
-        # self.ufm = self.ufm.multiply(iuf)
-        print("Feature weighting done")
 
         # NEIGHBOR FORMATION
         # normalize matrix
@@ -113,7 +100,7 @@ class xSquared():
         # eliminate non target users
         S = S[[dataset.get_playlist_index_from_id(x) for x in target_playlist]]
         # keep only top k similar user for each row
-        indices = np.argpartition(S, S.shape[1] - k_similar, axis=1)[:, :-k_similar] # keep all rows but until k columns
+        indices = np.argpartition(S, S.shape[1] - self.k_similar, axis=1)[:, :-self.k_similar] # keep all rows but until k columns
         for i in range(S.shape[0]):
             S[i, indices[i]] = 0
         S = csr_matrix(S)
@@ -218,3 +205,6 @@ class xSquared():
         recs[pl_id] = tracks_ids
         print(pl_id, recs[pl_id])
         return recs
+
+    def getR_hat(self):
+        return self.R_hat

@@ -1,5 +1,6 @@
 import scipy.sparse as sps
 import numpy as np
+from sklearn.cluster import KMeans
 
 
 def top_k_filtering(matrix, topK):
@@ -23,6 +24,61 @@ def top_k_filtering(matrix, topK):
                     row, row.shape[0] - topK)[:-topK]
                 matrix[row_i][sorted_idx] = 0
     return matrix
+
+
+def cluster_per_n_rating(urm, tg_playlist, ds, n_cluster):
+    n_rating = urm.sum(axis=1)
+    rating_cluster = KMeans(n_clusters=n_cluster).fit_predict(n_rating)
+
+    # keep only tg users
+    rating_cluster = rating_cluster[[ds.get_playlist_index_from_id(x) for x in tg_playlist]]
+
+    return rating_cluster
+
+
+def cluster_per_ucm(urm, tg_playlist, ds, n_cluster):
+    icm = ds.build_icm()
+    ucm = ds.build_ucm().transpose()
+
+    # get uicm: Users x Features
+    uicm = urm.dot(icm.transpose())
+
+    # Normalize UICM
+    n_ratings = urm.sum(axis=1)
+    n_ratings [n_ratings == 0] = 1
+    n_ratings.data = np.reciprocal(n_ratings.data)
+    uicm = uicm.multiply(n_ratings)
+
+    # Stack uicm ucm on uicm
+    ucm = sps.hstack([ucm, uicm], format='csr')
+
+    ucm_cluster = KMeans(n_clusters=n_cluster).fit_predict(ucm)
+
+    # keep only tg users
+    ucm_cluster = ucm_cluster[[ds.get_playlist_index_from_id(x) for x in tg_playlist]]
+
+    return ucm_cluster
+
+
+def cluster_per_uicm(urm, tg_playlist, ds, n_cluster):
+
+    icm = ds.build_icm()
+
+    # get uicm: Users x Features
+    uicm = urm.dot(icm.transpose())
+
+    # Normalize UICM
+    n_ratings = urm.sum(axis=1)
+    n_ratings[n_ratings == 0] = 1
+    n_ratings.data = np.reciprocal(n_ratings.data)
+    uicm = uicm.multiply(n_ratings)
+
+    ucm_cluster = KMeans(n_clusters=n_cluster).fit_predict(uicm)
+
+    # keep only tg users
+    ucm_cluster = ucm_cluster[[ds.get_playlist_index_from_id(x) for x in tg_playlist]]
+
+    return ucm_cluster
 
 
 def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=100):
@@ -216,3 +272,15 @@ def max_normalize(X):
         max_r = X.max(axis=1)
         max_r.data = np.reciprocal(max_r.data)
         return X.multiply(max_r)
+
+
+def normalize_by_row(X):
+    """
+    Normalizes matrix by rows
+    """
+    # normalize S_mixed
+    x_norm = X.sum(axis=1)
+    x_norm[x_norm == 0] = 1
+    # normalize s
+    X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)))
+    return X

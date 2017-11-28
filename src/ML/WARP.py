@@ -13,9 +13,10 @@ class WARP():
         self.pl_id_list = None
         self.tr_id_list = None
         self.model = None
+        self.icm_t = None
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=5, item_alpha=1e-4, l_rate=0.005):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=1000, n_epochs=5, item_alpha=1e-4, l_rate=5e-2):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         if self.model is None:
@@ -24,22 +25,22 @@ class WARP():
         # Need an identity matrix stacked horizontaly
         # Unknown reason, refer to:
         # https://github.com/lyst/lightfm/blob/master/lightfm/lightfm.py
-        id_item = eye(urm.shape[1], urm.shape[1]).tocsr()
-        icm = dataset.build_icm().tocsr()
-        icm_t = hstack((id_item, icm.transpose())).tocsr().astype(np.float32)
+        if self.icm_t is None:
+            id_item = eye(urm.shape[1], urm.shape[1]).tocsr()
+            icm = dataset.build_icm().tocsr()
+            self.icm_t = hstack((id_item, icm.transpose())).tocsr().astype(np.float32)
 
-        id_playlist = eye(urm.shape[0], urm.shape[0]).tocsr()
-        ucm = dataset.build_ucm().tocsr()
-        ucm_t = hstack((id_playlist, ucm.transpose())).tocsr().astype(np.float32)
+        # id_playlist = eye(urm.shape[0], urm.shape[0]).tocsr()
+        # ucm = dataset.build_ucm().tocsr()
+        # ucm_t = hstack((id_playlist, ucm.transpose())).tocsr().astype(np.float32)
 
         # iterarray = range(10, 110, 10)
 
         # patk_learning_curve(model, urm, test_urm, urm, iterarray, item_features=icm.transpose(), **{'num_threads': 4})
 
         self.model.fit_partial(urm,
-                          item_features=icm_t,
-                          user_features=ucm_t,
-                          epochs=n_epochs, **{'num_threads': 4})
+                          epochs=n_epochs,
+                          item_features=self.icm_t, num_threads=4)
         print("Training finished")
 
         tr_indices = np.array(
@@ -49,10 +50,12 @@ class WARP():
         cont = 0
         for u_id in tg_playlist:
             u_index = dataset.get_playlist_index_from_id(u_id)
+            # R_hat[cont] = self.model.predict(
+            #     u_index, tr_indices, item_features=icm_t, user_features=ucm_t, num_threads=4)
             R_hat[cont] = self.model.predict(
-                u_index, tr_indices, item_features=icm_t, user_features=ucm_t, num_threads=4)
+                 u_index, tr_indices, num_threads=4, item_features=self.icm_t)
             if cont % 1000 == 0:
-                print("Done: ", cont)
+                print("Done: ", cont, flush=True)
             cont += 1
         self.R_hat = csr_matrix(R_hat)
 
@@ -80,7 +83,7 @@ if __name__ == '__main__':
         warp = WARP()
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
         test_urm = ev.get_test_matrix(i, ds)
-        for epoch in range(20):
+        for epoch in range(50):
             warp.fit(urm, ds, list(tg_playlist), list(tg_tracks))
             recs = warp.predict()
             ev.evaluate_fold(recs)

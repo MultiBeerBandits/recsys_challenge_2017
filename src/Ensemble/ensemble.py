@@ -5,35 +5,39 @@ import numpy as np
 import numpy.linalg as LA
 import scipy.sparse.linalg as sLA
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
+from src.utils.cluster import build_user_cluster
+from src.Pop.popularity import Popularity
 from src.FWUM.UICF import xSquared
 from src.CBF.CBF import ContentBasedFiltering
 from src.UBF.UBF import UserBasedFiltering
-from src.utils.cluster import build_user_cluster
 from src.MF.iALS import IALS
+
 
 
 class Ensemble(object):
 
-    def __init__(self):
+    def __init__(self, models, normalize_ratings=False):
+        """
+        models is a list of recommender models implementing fit
+        each model should implement BaseRecommender class
+        """
         self.dataset = None
-        self.xbf = xSquared()
-        self.cbf = ContentBasedFiltering()
-        self.ubf = UserBasedFiltering()
-        self.ials = None
+        self.models = models
+        self.normalize_ratings = normalize_ratings
 
-    def mix(self, models, params, normalize_ratings=False):
+    def mix(self, params):
         """
         takes an array of models all with R_hat as atttribute
         and mixes them using params
         params: array of attributes
         """
         R_hat_mixed = lil_matrix(
-            (models[0].R_hat.shape[0], models[0].R_hat.shape[1]))
-        for i in range(len(models)):
-            if normalize_ratings:
-                current_r_hat = self.max_normalize(models[i].R_hat)
+            (self.models[0].R_hat.shape[0], self.models[0].R_hat.shape[1]))
+        for i in range(len(self.models)):
+            if self.normalize_ratings:
+                current_r_hat = self.max_normalize(self.models[i].R_hat)
             else:
-                current_r_hat = models[i].R_hat
+                current_r_hat = self.models[i].R_hat
             R_hat_mixed += current_r_hat.multiply(params[i])
         return R_hat_mixed.tocsr()
 
@@ -77,8 +81,7 @@ class Ensemble(object):
 
     def predict(self, params, at=5):
         # Mix them all
-        models = [self.xbf, self.cbf, self.ubf, self.ials]
-        R_hat = self.mix(models, params, normalize_ratings=False)
+        R_hat = self.mix(params)
         """
         returns a dictionary of
         'pl_id': ['tr_1', 'tr_at'] for each playlist in target playlist
@@ -102,11 +105,10 @@ class Ensemble(object):
         """
         self.tr_id_list = tg_tracks
         self.pl_id_list = tg_playlist
-        self.ials = IALS(urm.copy(), 500, 50, 1e-4, 800)
-        self.xbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        self.cbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        self.ubf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        self.ials.fit(tg_playlist, tg_tracks, ds)
+
+        # call fit on all models
+        for model in self.models:
+            model.fit(urm.copy(), tg_playlist, tg_tracks, ds)
 
     def fit_cluster(self, params):
         ds = Dataset(load_tags=True, filter_tag=True)
@@ -143,33 +145,32 @@ def main():
     ds = Dataset(load_tags=True, filter_tag=True)
     ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
     ds.set_playlist_attr_weights(0.5, 0.5, 0.5, 0.05, 0.05)
-    ev = Evaluator()
-    params = [0.00334, 0.3802, 0.0096, 0.0689]
-    ev.cross_validation(4, ds.train_final.copy())
-    for i in range(0, 4):
-        ensemble = Ensemble()
-        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        test_dict = ev.get_test_dict(i)
-        ensemble.fit(urm, list(tg_tracks),
-                list(tg_playlist),
-                ds)
-        recs = ensemble.predict(params)
-        ev.evaluate_fold(recs)
-    map_at_five = ev.get_mean_map()
-    print("MAP@5 ", map_at_five)
+    params = [0.30860, 0.85577, 0.07349, 0.03564, 0.00063265]
+    # create all the models
+    cbf = ContentBasedFiltering()
+    xbf = xSquared()
+    ials = IALS(500, 50, 1e-4, 800)
+    ubf = UserBasedFiltering()
+    # bpr_cslim = create_BPR_SLIM(urm, ds)
+    pop = Popularity()
+
+    # add models to list of models
+    models = [xbf, cbf, ubf, ials, pop]
+
+    # create the ensemble
+    ensemble = Ensemble(models)
 
     # export csv
-    ensemble = Ensemble()
     urm = ds.build_train_matrix()
     tg_playlist = list(ds.target_playlists.keys())
     tg_tracks = list(ds.target_tracks.keys())
-    # Train the model with the best shrinkage found in cross-validation
+    # Train the model
     ensemble.fit(urm,
-                     tg_tracks,
-                     tg_playlist,
-                     ds)
+                 tg_tracks,
+                 tg_playlist,
+                 ds)
     recs = ensemble.predict(params)
-    with open('submission_cbf.csv', mode='w', newline='') as out:
+    with open('submission_ensemble.csv', mode='w', newline='') as out:
         fieldnames = ['playlist_id', 'track_ids']
         writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
         writer.writeheader()
@@ -179,6 +180,7 @@ def main():
                 track_ids = track_ids + r + ' '
             writer.writerow({'playlist_id': k,
                              'track_ids': track_ids[:-1]})
+
 
 if __name__ == '__main__':
     print("Ensemble started")

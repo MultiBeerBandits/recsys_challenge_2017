@@ -5,6 +5,7 @@ from src.utils.loader import *
 from src.utils.evaluator import *
 from src.utils.matrix_utils import top_k_filtering, compute_cosine
 from src.MF.iALS import IALS
+from src.ML.CSLIM_parallel import SLIM
 
 
 class SimEnsemble():
@@ -31,24 +32,31 @@ class SimEnsemble():
         self.pl_id_list = list(tg_playlist)
         self.tr_id_list = list(tg_tracks)
         self.dataset = dataset
+        self.urm = urm
+
+        # Build slim similarity
+        slim = SLIM()
+        slim.fit(urm, self.pl_id_list, self.tr_id_list, dataset)
+        S_cslim = slim.getW()
+        S_cslim = S_cslim[:, [dataset.get_track_index_from_id(x) for x in self.tr_id_list]].transpose()
+
         # Build content based similarity
         icm = dataset.build_icm()
-
         S_cbf = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], icm, k_filtering=200, shrinkage=10)
 
         # Build collaborative similarity
         S_cf = compute_cosine(urm.transpose()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], urm, k_filtering=200, shrinkage=10)
 
         # Build similarity from implicit model
-        ials = IALS(urm, 500, 50, 1e-4, 800)
-        ials.fit(tg_playlist, tg_tracks, dataset)
-        item_factors = csr_matrix(ials.model.item_factors)
-        S_ials = compute_cosine(item_factors[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], item_factors.transpose(), k_filtering=200, shrinkage=10)
+        # ials = IALS(500, 50, 1e-4, 800)
+        # ials.fit(urm, tg_playlist, tg_tracks, dataset)
+        # item_factors = ials.model.item_factors
+        # S_ials = compute_cosine(item_factors[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], item_factors.transpose(), k_filtering=200, shrinkage=10)
 
         # append all similarities
         self.similarities.append(S_cbf)
         self.similarities.append(S_cf)
-        self.similarities.append(S_ials)
+        self.similarities.append(S_cslim)
 
     def mix(self, params):
         """
@@ -56,11 +64,12 @@ class SimEnsemble():
         and mixes them using params
         params: array of attributes
         """
+        urm = self.urm
         R_hat_mixed = lil_matrix(
-            (len(self.tg_playlist), len(self.tg_tracks)))
+            (len(self.pl_id_list), len(self.tr_id_list)))
         S_mixed = lil_matrix((self.similarities[0].shape[0], self.similarities[0].shape[1]))
-        for i in range(len(models)):
-            S_mixed += similarities[i].multiply(params[i])
+        for i in range(len(self.similarities)):
+            S_mixed += self.similarities[i].multiply(params[i])
         # normalize S_mixed
         s_norm = S_mixed.sum(axis=1)
         # normalize s
@@ -88,17 +97,3 @@ class SimEnsemble():
             tracks_ids = [self.tr_id_list[x] for x in track_cols]
             recs[pl_id] = tracks_ids
         return recs
-
-
-if __name__ == '__main__':
-    ds = Dataset(load_tags=True, filter_tag=True)
-    ev = Evaluator()
-    ev.cross_validation(5, ds.train_final.copy())
-    for i in range(0, 5):
-        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        ials = IALS(urm, 600, 70, 1e-2, 800)
-        ials.fit(list(tg_playlist), list(tg_tracks), ds)
-        recs = ials.predict(list(tg_playlist), list(tg_tracks), ds)
-        ev.evaluate_fold(recs)
-    map_at_five = ev.get_mean_map()
-    print("MAP@5 Final", map_at_five)
