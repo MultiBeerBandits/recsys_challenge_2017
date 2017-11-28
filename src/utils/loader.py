@@ -190,10 +190,13 @@ class Dataset():
                 albums = parse_csv_array(row['album'])
                 if len(albums) == 0:
                     # set the album with more tracks of that artist
-                    if artist_id in self.album_artist.keys():
-                        album = self.album_artist[artist_id][np.argmax(self.album_artist_counter[artist_id])]
-                        album_index = self.track_attr_mapper['album'][album]
-                        icm[album_index, track_index] = self.album_weight
+                    # if artist_id in self.album_artist.keys():
+                    #     album = self.album_artist[artist_id][np.argmax(self.album_artist_counter[artist_id])]
+                    #     album_index = self.track_attr_mapper['album'][album]
+                    #     icm[album_index, track_index] = self.album_weight
+                    # add the None album of that artist
+                    album_index = self.track_attr_mapper['album'][artist_id]
+                         icm[album_index, track_index] = self.album_weight
                 for album in albums:
                     album_index = self.track_attr_mapper['album'][album]
                     icm[album_index, track_index] = self.album_weight
@@ -832,6 +835,10 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
         mapper['artist_id'][v] = attr_index
         attr_index += 1
     for v in attrs['album']:
+        mapper['album'][v] = attr_index
+        attr_index += 1
+    # add artist values to album to represent None album of each artist
+    for v in attrs['artist_id']:
         mapper['album'][v] = attr_index
         attr_index += 1
     # load tags only if specified and only if higher than pop threshold
