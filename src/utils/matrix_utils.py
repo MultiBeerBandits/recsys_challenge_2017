@@ -284,3 +284,17 @@ def normalize_by_row(X):
     # normalize s
     X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)))
     return X
+
+
+def writeSubmission(fileName, recs, tg_playlist):
+    import csv
+    with open(fileName, mode='w', newline='') as out:
+        fieldnames = ['playlist_id', 'track_ids']
+        writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
+        writer.writeheader()
+        for k in tg_playlist:
+            track_ids = ''
+            for r in recs[k]:
+                track_ids = track_ids + r + ' '
+            writer.writerow({'playlist_id': k,
+                             'track_ids': track_ids[:-1]})

@@ -40,7 +40,7 @@ cdef class SLIM_BPR_Cython_Epoch:
     cdef int m_rows, m_cols
     cdef int numPositiveIteractions
     cdef int topK
-    cdef int useAdaGrad, rmsprop
+    cdef int useAdaGrad, rmsprop, momentum
 
     cdef float learning_rate
 
@@ -102,6 +102,8 @@ cdef class SLIM_BPR_Cython_Epoch:
             self.useAdaGrad = True
         elif sgd_mode == 'rmsprop':
             self.rmsprop = True
+        elif sgd_mode == 'momentum':
+            self.momentum = True
         elif sgd_mode == 'sgd':
             pass
         else:
@@ -146,6 +148,10 @@ cdef class SLIM_BPR_Cython_Epoch:
             sgd_cache = np.zeros((self.n_items), dtype=float)
             gamma = 0.001
 
+        elif self.momentum:
+            sgd_cache = np.zeros((self.n_items), dtype=float)
+            gamma = 1e-5
+
         for numIteration in range(self.numPositiveIteractions):
             sample = self.sampleBatch_Cython()
 
@@ -182,14 +188,26 @@ cdef class SLIM_BPR_Cython_Epoch:
 
                 gradient = gradient / (sqrt(sgd_cache[i]) + 1e-8)
 
+            # Apply momentum and store current variation
+            if self.momentum:
+                dS_i = self.learning_rate * gradient + gamma * sgd_cache[i]
+                dS_j = self.learning_rate * (-gradient) + gamma * sgd_cache[j]
+
+                sgd_cache[i] = dS_i
+                sgd_cache[j] = dS_j
+            else:
+                dS_i = self.learning_rate * gradient
+                dS_j = self.learning_rate * (-gradient)
+
             index = 0
             while index < numSeenItemsSampledRow:
                 seenItem = seenItemsSampledRow[index]
                 index += 1
+                
                 if seenItem != i:
-                    self.S.add_value(i, seenItem, self.learning_rate * gradient)
+                    self.S.add_value(i, seenItem, dS_i)
                 if seenItem != j:
-                    self.S.add_value(j, seenItem, self.learning_rate * (-gradient))
+                    self.S.add_value(j, seenItem, dS_j)
 
             if((numIteration % printStep == 0 and not numIteration == 0) or
                 numIteration == self.numPositiveIteractions - 1):
