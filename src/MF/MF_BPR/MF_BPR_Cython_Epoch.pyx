@@ -15,12 +15,15 @@ Created on 07/09/17
 
 #defining NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 
+# for the adam implementation refer to: 
+# http://ruder.io/optimizing-gradient-descent/index.html
+
 import numpy as np
 cimport numpy as np
 import time
 import sys
-
-from libc.math cimport exp, sqrt
+cimport cython
+from libc.math cimport exp, sqrt, pow
 from libc.stdlib cimport rand, RAND_MAX
 
 
@@ -36,11 +39,14 @@ cdef class MF_BPR_Cython_Epoch:
     cdef int n_items, num_factors
     cdef int numPositiveIteractions
 
-    cdef int useAdaGrad, rmsprop
+    cdef int useAdaGrad, rmsprop, useAdam
 
     cdef float learning_rate, user_reg, positive_reg, negative_reg
 
     cdef int batch_size, sparse_weights
+    cdef long training_step
+    cdef long[:] training_step_users
+    cdef long[:] training_step_items
 
     cdef long[:] eligibleUsers
     cdef long numEligibleUsers
@@ -48,12 +54,46 @@ cdef class MF_BPR_Cython_Epoch:
     cdef int[:] seenItemsSampledUser
     cdef int numSeenItemsSampledUser
 
+    cdef long[:] target_users
+    cdef int num_target_users
+    cdef long[:] target_items
+    cdef int num_target_items
+
     cdef int[:] URM_mask_indices, URM_mask_indptr
+
+    # ADAM
+    cdef double[:,:] cache_m_user
+    cdef double[:,:] cache_v_user
+
+    cdef double[:,:] cache_m_item
+    cdef double[:,:] cache_v_item
+
+    # RMSPROP
+    cdef double[:,:] rmsprop_cache_user
+    cdef double[:,:] rmsprop_cache_item
+
+    cdef double[:] sgd_cache
+    cdef double[:] sgd_cache_user
+
+    cdef double gamma
 
     cdef double[:,:] W, H
 
+    # refer to Adam Paper
+    cdef double beta1
+    cdef double beta2
+    cdef double epsilon
 
-    def __init__(self, URM_mask, eligibleUsers, num_factors,
+    # sample strategy
+    cdef int target_prob
+    # it's used in this way: 
+    # decision = rand()%total_prob
+    # if decision < target_prob : sample from target
+    # else sample from all
+    cdef int total_prob
+
+
+    def __init__(self, URM_mask, eligibleUsers, num_factors, target_users=None, target_items=None,
                  learning_rate = 0.05, user_reg = 0.0, positive_reg = 0.0, negative_reg = 0.0,
                  batch_size = 1, sgd_mode='sgd', epoch_multiplier=1.0):
 
@@ -68,11 +108,8 @@ cdef class MF_BPR_Cython_Epoch:
         self.URM_mask_indptr = URM_mask.indptr
 
         # W and H cannot be initialized as zero, otherwise the gradient will always be zero
-        self.W = np.random.random((self.n_users, self.num_factors))
-        self.H = np.random.random((self.n_items, self.num_factors))
-
-        self.useAdaGrad = False
-
+        self.W = np.multiply(np.random.random((self.n_users, self.num_factors)), 0.1)
+        self.H = np.multiply(np.random.random((self.n_items, self.num_factors)), 0.1)
 
 
         if sgd_mode=='sgd':
@@ -81,10 +118,34 @@ cdef class MF_BPR_Cython_Epoch:
             self.useAdaGrad = True
         elif sgd_mode == 'rmsprop':
             self.rmsprop = True
+        elif sgd_mode == 'adam':
+            self.useAdam = True
         else:
             raise ValueError(
                 "SGD_mode not valid. Acceptable values are: 'sgd'. Provided value was '{}'".format(
                     sgd_mode))
+
+        if self.useAdaGrad:
+            self.sgd_cache = np.zeros((self.n_items), dtype=float)
+            self.sgd_cache_user = np.zeros((self.n_users), dtype=float)
+        
+        # RMSPROP
+        elif self.rmsprop:
+            self.rmsprop_cache_item = np.zeros((self.n_items, self.num_factors), dtype=float)
+            self.rmsprop_cache_user = np.zeros((self.n_users, self.num_factors), dtype=float)
+            self.gamma = 0.9
+
+        # Adam requirements
+        elif self.useAdam:
+            self.cache_m_user = np.zeros((self.n_users, self.num_factors), dtype=float)
+            self.cache_v_user = np.zeros((self.n_users, self.num_factors), dtype=float)
+            self.cache_m_item = np.zeros((self.n_items, self.num_factors), dtype=float)
+            self.cache_v_item = np.zeros((self.n_items, self.num_factors), dtype=float)
+            self.training_step_users = np.zeros((self.n_users), dtype=long)
+            self.training_step_items = np.zeros((self.n_items), dtype=long)
+            self.beta1 = 0.9
+            self.beta2 = 0.999
+            self.epsilon = 1e-8
 
 
 
@@ -101,14 +162,29 @@ cdef class MF_BPR_Cython_Epoch:
         self.eligibleUsers = eligibleUsers
         self.numEligibleUsers = len(eligibleUsers)
 
+        if target_users is not None:
+            self.target_users = target_users
+            self.num_target_users = len(target_users)
+        if target_items is not None:
+            self.target_items = target_items
+            self.num_target_items = len(target_items)
+        self.training_step = 0
+
+        # sample strategy
+        self.target_prob = 5
+        self.total_prob = 10
+
 
     # Using memoryview instead of the sparse matrix itself allows for much faster access
     cdef int[:] getSeenItems(self, long index):
         return self.URM_mask_indices[self.URM_mask_indptr[index]:self.URM_mask_indptr[index + 1]]
 
 
-
-    def epochIteration_Cython(self):
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
+    def epochIteration_Cython(self, l_rate, reset_cache=True):
 
         # Get number of available interactions
         cdef long totalNumberOfBatch = int(self.numPositiveIteractions / self.batch_size) + 1
@@ -123,22 +199,42 @@ cdef class MF_BPR_Cython_Epoch:
 
         # Variables for AdaGrad and RMSprop
         cdef double [:] sgd_cache
-        cdef double cacheUpdate
+        cdef double cacheUpdate, cacheUpdate_i, cacheUpdate_j, cacheUpdate_u
         cdef float gamma
 
         cdef double H_i, H_j, W_u
-
-        #
-        if self.useAdaGrad:
-             sgd_cache = np.zeros((self.n_items), dtype=float)
-        #
-        elif self.rmsprop:
-             sgd_cache = np.zeros((self.n_items), dtype=float)
-             gamma = 0.001
+        cdef double gradient_i, gradient_u, gradient_j
+        cdef double update_u, update_i, update_j
+        cdef double gtu, gti, gtj
 
 
         cdef long start_time_epoch = time.time()
         cdef long start_time_batch = time.time()
+
+        self.learning_rate = l_rate
+
+        if reset_cache:
+            self.training_step = 0
+            if self.useAdaGrad:
+                self.sgd_cache = np.zeros((self.n_items), dtype=float)
+                self.sgd_cache_user = np.zeros((self.n_users), dtype=float)
+
+            elif self.rmsprop:
+                self.rmsprop_cache_item = np.zeros((self.n_items, self.num_factors), dtype=float)
+                self.rmsprop_cache_user = np.zeros((self.n_users, self.num_factors), dtype=float)
+                self.gamma = 0.9
+
+            # Adam requires
+            elif self.useAdam:
+                self.cache_m_user = np.zeros((self.n_users, self.num_factors), dtype=float)
+                self.cache_v_user = np.zeros((self.n_users, self.num_factors), dtype=float)
+                self.cache_m_item = np.zeros((self.n_items, self.num_factors), dtype=float)
+                self.cache_v_item = np.zeros((self.n_items, self.num_factors), dtype=float)
+                self.training_step_users = np.zeros((self.n_users), dtype=long)
+                self.training_step_items = np.zeros((self.n_items), dtype=long)
+                self.beta1 = 0.9
+                self.beta2 = 0.999
+                self.epsilon = 1e-8
 
         for numCurrentBatch in range(totalNumberOfBatch):
 
@@ -149,6 +245,12 @@ cdef class MF_BPR_Cython_Epoch:
             i = sample.pos_item
             j = sample.neg_item
 
+            # add training step
+            self.training_step_users[u] += 1
+            self.training_step_items[i] += 1
+            self.training_step_items[j] += 1
+
+
             x_uij = 0.0
 
             for index in range(self.num_factors):
@@ -156,25 +258,32 @@ cdef class MF_BPR_Cython_Epoch:
                 x_uij += self.W[u,index] * (self.H[i,index] - self.H[j,index])
 
             # Use gradient of log(sigm(-x_uij))
-            gradient = 1 / (1 + exp(x_uij))
-
+            sigmoid = 1 / (1 + exp(x_uij))
 
             #   OLD CODE, YOU MAY TRY TO USE IT
-            if self.useAdaGrad:
-                cacheUpdate = gradient ** 2
+            # if self.useAdaGrad:
+            #     cacheUpdate = gradient ** 2
             
-                sgd_cache[i] += cacheUpdate
-                sgd_cache[j] += cacheUpdate
+            #     self.sgd_cache[i] += cacheUpdate
+            #     self.sgd_cache[j] += cacheUpdate
+            #     self.sgd_cache_user[u]+= cacheUpdate
+
+            #     gradient_i = gradient / (sqrt(self.sgd_cache[i]) + 1e-8)
+            #     gradient_j = gradient / (sqrt(self.sgd_cache[j]) + 1e-8)
+            #     gradient_u = gradient / (sqrt(self.sgd_cache_user[u]) + 1e-8)
             
-                gradient = gradient / (sqrt(sgd_cache[i]) + 1e-8)
+            # elif self.rmsprop:
+            #     cacheUpdate_i = self.sgd_cache[i] * self.gamma + (1 - self.gamma) * gradient ** 2
+            #     cacheUpdate_j = self.sgd_cache[j] * self.gamma + (1 - self.gamma) * gradient ** 2
+            #     cacheUpdate_u = self.sgd_cache_user[u] * self.gamma + (1 - self.gamma) * gradient ** 2
             
-            elif self.rmsprop:
-                cacheUpdate = sgd_cache[i] * gamma + (1 - gamma) * gradient ** 2
+            #     self.sgd_cache[i] = cacheUpdate_i
+            #     self.sgd_cache[j] = cacheUpdate_j
+            #     self.sgd_cache_user[u] = cacheUpdate_u
             
-                sgd_cache[i] += cacheUpdate
-                sgd_cache[j] += cacheUpdate
-            
-                gradient = gradient / (sqrt(sgd_cache[i]) + 1e-8)
+            #     gradient_i = gradient / (sqrt(self.sgd_cache[i]) + 1e-8)
+            #     gradient_j = gradient / (sqrt(self.sgd_cache[j]) + 1e-8)
+            #     gradient_u = gradient / (sqrt(self.sgd_cache_user[u]) + 1e-8)
 
 
             for index in range(self.num_factors):
@@ -184,9 +293,43 @@ cdef class MF_BPR_Cython_Epoch:
                 H_j = self.H[j, index]
                 W_u = self.W[u, index]
 
-                self.W[u, index] += self.learning_rate * (gradient * ( H_i - H_j ) - self.user_reg * W_u)
-                self.H[i, index] += self.learning_rate * (gradient * ( W_u ) - self.positive_reg * H_i)
-                self.H[j, index] += self.learning_rate * (gradient * (-W_u ) - self.negative_reg * H_j)
+                # calculate gradients
+                gtu = (-sigmoid * ( H_i - H_j ) + self.user_reg * W_u)
+                gti = (-sigmoid * ( W_u ) + self.positive_reg * H_i)
+                gtj = (-sigmoid * (-W_u ) + self.negative_reg * H_j)
+
+                if self.useAdam:
+
+                    # update of U params
+                    update_u = self.get_adam_update_user(gtu, u, index)
+
+                    # update of I params
+                    update_i = self.get_adam_update_item(gti, i, index)
+
+                    # update of J params
+                    update_j = self.get_adam_update_item(gtj, j, index)
+
+                elif self.rmsprop:
+
+                    # update of U params
+                    update_u = self.get_rmsprop_update_user(gtu, u, index)
+
+                    # update of I params
+                    update_i = self.get_rmsprop_update_item(gti, i, index)
+
+                    # update of J params
+                    update_j = self.get_rmsprop_update_item(gtj, j, index)
+
+                # Let's update
+                self.W[u, index] -= self.learning_rate * update_u
+                self.H[i, index] -= self.learning_rate * update_i
+                self.H[j, index] -= self.learning_rate * update_j
+                
+                # else:  
+                #     # normal updates
+                #     self.W[u, index] += self.learning_rate * (gradient_u * ( H_i - H_j ) - self.user_reg * W_u)
+                #     self.H[i, index] += self.learning_rate * (gradient_i * ( W_u ) - self.positive_reg * H_i)
+                #     self.H[j, index] += self.learning_rate * (gradient_j * (-W_u ) - self.negative_reg * H_j)
 
 
 
@@ -211,8 +354,85 @@ cdef class MF_BPR_Cython_Epoch:
     def get_H(self):
         return np.array(self.H)
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
+    cdef float get_adam_update_user(self, float gradient, int u, int k):
+        """
+        Returns the update due to the Adam optimization technique
+        """
+        cdef double new_cache_m_value, new_cache_v_value, m_hat, v_hat
+        new_cache_m_value = self.beta1 * self.cache_m_user[u, k] + (1 - self.beta1) * gradient
+        new_cache_v_value = self.beta2 * self.cache_v_user[u, k] + (1 - self.beta2) * gradient * gradient
+
+        # update caches
+        self.cache_m_user[u, k] = new_cache_m_value
+        self.cache_v_user[u, k] = new_cache_v_value
+
+        # correction part
+        m_hat = new_cache_m_value / (1 - pow(self.beta1, self.training_step_users[u]))
+        v_hat = new_cache_v_value / (1 - pow(self.beta2, self.training_step_users[u]))
+
+        return m_hat / (sqrt(v_hat) + self.epsilon)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
+    cdef float get_adam_update_item(self, float gradient, int i, int k):
+        """
+        Returns the update due to the Adam optimization technique
+        """
+        cdef double new_cache_m_value, new_cache_v_value, m_hat, v_hat
+        new_cache_m_value = self.beta1 * self.cache_m_item[i, k] + (1 - self.beta1) * gradient
+        new_cache_v_value = self.beta2 * self.cache_v_item[i, k] + (1 - self.beta2) * gradient * gradient
+
+        # update caches
+        self.cache_m_item[i, k] = new_cache_m_value
+        self.cache_v_item[i, k] = new_cache_v_value
+
+        # correction part
+        m_hat = new_cache_m_value / (1 - pow(self.beta1, self.training_step_items[i]))
+        v_hat = new_cache_v_value / (1 - pow(self.beta2, self.training_step_items[i]))
+
+        return m_hat / (sqrt(v_hat) + self.epsilon)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
+    cdef float get_rmsprop_update_user(self, float gradient, int u, int k):
+        """
+        Returns the update due to the RMSprop optimization technique
+        """
+        cdef double new_cache_value
+        new_cache_value = self.rmsprop_cache_user[u, k] * self.gamma + (1 - self.gamma) * gradient ** 2
+        
+        self.rmsprop_cache_user[u, k] = new_cache_value
+
+        return gradient / (sqrt(new_cache_value + 1e-8))
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
+    cdef float get_rmsprop_update_item(self, float gradient, int i, int k):
+        """
+        Returns the update due to the RMSprop optimization technique
+        """
+        cdef double new_cache_value
+        new_cache_value = self.rmsprop_cache_item[i, k] * self.gamma + (1 - self.gamma) * gradient ** 2
+        
+        self.rmsprop_cache_item[i, k] = new_cache_value
+
+        return gradient / (sqrt(new_cache_value + 1e-8))
 
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
     cdef BPR_sample sampleBatch_Cython(self):
 
         cdef BPR_sample sample = BPR_sample()
@@ -224,6 +444,63 @@ cdef class MF_BPR_Cython_Epoch:
         index = rand() % self.numEligibleUsers
 
         sample.user = self.eligibleUsers[index]
+
+        self.seenItemsSampledUser = self.getSeenItems(sample.user)
+        self.numSeenItemsSampledUser = len(self.seenItemsSampledUser)
+
+        index = rand() % self.numSeenItemsSampledUser
+
+        sample.pos_item = self.seenItemsSampledUser[index]
+
+
+        negItemSelected = False
+
+        # It's faster to just try again then to build a mapping of the non-seen items
+        # for every user
+        while (not negItemSelected):
+            sample.neg_item = rand() % self.n_items
+
+            index = 0
+            while index < self.numSeenItemsSampledUser and self.seenItemsSampledUser[index]!=sample.neg_item:
+                index+=1
+
+            if index == self.numSeenItemsSampledUser:
+                negItemSelected = True
+
+        return sample
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
+    cdef BPR_sample sample_from_target(self):
+        """
+        Takes one of the two items from the target items
+        """
+
+        cdef BPR_sample sample = BPR_sample()
+        cdef long index
+        cdef int negItemSelected
+        cdef int decision
+
+        # Warning: rand() returns an integer
+
+        # decide if sample from target or from non target
+        decision = rand() % self.total_prob
+
+        if decision > self.target_prob:
+
+            # sample from all
+            index = rand() % self.numEligibleUsers
+
+            sample.user = self.eligibleUsers[index]
+
+        else:
+
+            # sample from target
+            index = rand() % self.num_target_users
+
+            sample.user = self.target_users[index]
 
         self.seenItemsSampledUser = self.getSeenItems(sample.user)
         self.numSeenItemsSampledUser = len(self.seenItemsSampledUser)
