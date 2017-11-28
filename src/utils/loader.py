@@ -97,6 +97,17 @@ class Dataset():
         self.tags_weight = tags_w
         self.track_num_rating_weight = num_rating_weight
 
+    def set_track_attr_weights_2(self, art_w, alb_w, dur_w, playcount_w, tags_w, num_rating_weight=1, inferred_album=0.9, inferred_duration=0.1, inferred_playcount=0.1):
+        self.artist_weight = art_w
+        self.album_weight = alb_w
+        self.inferred_album_weight = inferred_album
+        self.duration_weight = dur_w
+        self.playcount_weight = playcount_w
+        self.tags_weight = tags_w
+        self.track_num_rating_weight = num_rating_weight
+        self.inferred_playcount_weight = inferred_playcount
+        self.inferred_duration_weight = inferred_duration
+
     def set_playlist_attr_weights(self, created_at_weight, owner_weight, title_weight, duration_weight, numtracks_weight=1):
         self.created_at_weight = created_at_weight
         self.owner_weight = owner_weight
@@ -195,10 +206,8 @@ class Dataset():
                     #     album_index = self.track_attr_mapper['album'][album]
                     #     icm[album_index, track_index] = self.album_weight
                     # add the None album of that artist
-                    if row['track_id'] in self.target_tracks:
-                        print("eheh")
-                    album_index = self.track_attr_mapper['album']['NONE']
-                    icm[album_index, track_index] = self.album_weight
+                    album_index = self.track_attr_mapper['album'][artist_id + 'NONE']
+                    icm[album_index, track_index] = self.inferred_album_weight
                 for album in albums:
                     album_index = self.track_attr_mapper['album'][album]
                     icm[album_index, track_index] = self.album_weight
@@ -212,35 +221,35 @@ class Dataset():
                             tag_weight = self.tag_counter[tag] * \
                                 self.tags_weight
                             icm[tag_index, track_index] = tag_weight
+
                 # duration
+                # get the clusters
+                duration_offset = self.duration_cluster[duration_index]
+                duration_index = self.track_attr_mapper['duration'] + \
+                    duration_offset
+
+                # select what weight to use
                 duration = row['duration']
                 if duration is not None and duration != '' and float(duration) != -1:
-                    # duration = float(duration) - self.min_duration
-                    # duration_offset = min(
-                    #     int(duration / self.duration_int), self.duration_intervals - 1)
-                    duration = float(duration)
-                    # duration_offset = np.digitize(duration, self.duration_bins) - 1
-                    # get the cluster
-                    duration_offset = self.duration_cluster[duration_index]
-                    duration_index = self.track_attr_mapper['duration'] + \
-                        duration_offset
                     icm[duration_index, track_index] = self.duration_weight
-                    # go ahead with duration index
-                    duration_index += 1
+                else:
+                    icm[duration_index, track_index] = self.inferred_duration_weight
+                # go ahead with duration index
+                duration_index += 1
+                # playcount
+                # playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
+                # get the cluster
+                playcount_offset = self.playcount_cluster[playcount_index]
+                playcount_index = self.track_attr_mapper['playcount'] + \
+                    playcount_offset
+
                 # playcount
                 playcount = row['playcount']
                 if playcount is not None and playcount != '' and float(playcount) != -1:
-                    # playcount = float(playcount) - self.min_playcount
-                    # playcount_offset = min(
-                    #     int(playcount / self.playcount_int), self.playcount_intervals - 1)
-                    playcount = float(playcount)
-                    # playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
-                    # get the cluster
-                    playcount_offset = self.playcount_cluster[playcount_index]
-                    playcount_index = self.track_attr_mapper['playcount'] + \
-                        playcount_offset
                     icm[playcount_index, track_index] = self.playcount_weight
-                    playcount_index += 1
+                else:
+                    icm[playcount_index, track_index] = self.inferred_playcount_weight
+                playcount_index += 1
         return csr_matrix(icm)
 
     def build_iucm(self, test_dict, path='./data/playlists_final'):
@@ -761,9 +770,10 @@ def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=Fal
     return track_id_mapper, track_index_mapper, mapper, attr_index, tag_counter
 
 
-def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag=False):
+def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag=False, add_info=True):
     """
     Build the mappers of tracks
+    add_info: adds information on missing durations and placount
     """
     # attrs is a dict that contains for every attribute its different values
     # used for mappers
@@ -777,14 +787,24 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
     # this is the number of columns of the matrix of the matrix
     track_index = 0
     # duration and playcount attributes
-    durations = []  # array of duration for dividing it in bins
-    playcounts = []  # the same as before
+    durations_ini = []  # array of initial duration for dividing it in bins
+    durations = [] # array of complete durations
+    playcounts_ini = []  # the same as before
+    playcounts = []  # array of complete playcounts
 
     # used for discriminating between the album of different artists
     # {'artist_id':set()}
     album_art = {}
     album_artist = {}
     album_artist_counter = {}
+
+    # for each artist the list of its duration 
+    # for making inference on missing data
+    artist_duration = {}
+
+    # for each artist the list of its playcount 
+    # for making inference on missing data
+    artist_playcount = {}
 
     with open(path, newline='') as csv_file:
         reader = csv.DictReader(csv_file, delimiter='\t')
@@ -803,7 +823,7 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
                     album_artist[artist_id].append(album)
                     album_artist_counter[artist_id].append(1)
                 else:
-                    album_artist_counter[artist_id][indexOf(album_artist[artist_id], album)] += 1 
+                    album_artist_counter[artist_id][indexOf(album_artist[artist_id], album)] += 1
             tags = parse_csv_array(row['tags'])
             for tag in tags:
                 attrs['tags'].add(tag)
@@ -819,13 +839,51 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
                 duration = float(row['duration'])
                 # threshold for max and cleaning
                 if duration != -1:  # and duration / 1000 < 700:
-                    durations.append(duration)
+                    durations_ini.append(duration)
+                    if artist_id not in artist_duration.keys():
+                        artist_duration[artist_id] = []
+                    artist_duration[artist_id].append(duration)
             if row['playcount'] is not None and row['playcount'] != '':
                 playcount = float(row['playcount'])
                 if playcount != 0.0 and playcount != -1.0:
                     # threshold for max
-                    playcounts.append(playcount)
+                    playcounts_ini.append(playcount)
+                    if artist_id not in artist_playcount.keys():
+                        artist_playcount[artist_id] = []
+                    artist_playcount[artist_id].append(playcount)
             track_index += 1
+    # rescan
+    with open(path, newline='') as csv_file:
+        # rescan in order to add playcount and durations
+        reader = csv.DictReader(csv_file, delimiter='\t')
+        for row in reader:
+            artist_id = row['artist_id']
+            # if it has a duration add to the array
+            if row['duration'] is not None and row['duration'] != '' and float(row['duration']) != -1.0:
+                duration = float(row['duration'])
+            else:
+                # infer with mean of the same artist or the global mean
+                if artist_id in artist_duration.keys():
+                    duration = np.mean(artist_duration[artist_id])
+                else:
+                    duration = np.median(durations_ini)
+
+            # add to the array
+            durations.append(duration)
+
+            # the same for playcount
+            if row['playcount'] is not None and row['playcount'] != '' and float(row['playcount']) != -1.0:
+                playcount = float(row['playcount'])
+            else:
+                # infer with mean of the same artist
+                if artist_id in artist_playcount.keys():
+                    playcount = np.mean(artist_playcount[artist_id])
+                else:
+                    playcount = np.median(playcounts_ini)
+
+            # add to the array
+            playcounts.append(playcount)
+
     # set tag counter
     dataset.tag_counter = tag_counter
     # is a dictionary of dictionary
@@ -840,9 +898,9 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
         mapper['album'][v] = attr_index
         attr_index += 1
     # add artist values to album to represent None album of each artist
-    # for v in attrs['artist_id']:
-    #     mapper['album'][v+'NONE'] = attr_index
-    #     attr_index += 1
+    for v in attrs['artist_id']:
+         mapper['album'][v + 'NONE'] = attr_index
+         attr_index += 1
     mapper['album']['NONE'] = attr_index
     attr_index += 1
     # load tags only if specified and only if higher than pop threshold
@@ -861,7 +919,6 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
     #             mapper['artist_album'][k] = {}
     #         mapper['artist_album'][k][album] = attr_index
     #         attr_index += 1
-
     #  Divide duration and playcount in cluster
     dataset.duration_cluster = KMeans(
         n_clusters=dataset.duration_intervals).fit_predict(np.reshape(durations, (-1, 1)))

@@ -23,7 +23,7 @@ class ContentBasedFiltering(BaseRecommender):
         self.shrinkage = shrinkage
         self.k_filtering = k_filtering
 
-    def fit(self, urm, target_playlist, target_tracks, dataset):
+    def fit(self, urm, target_playlist, target_tracks, dataset, urm_weight=0.4):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -40,41 +40,35 @@ class ContentBasedFiltering(BaseRecommender):
         self.dataset = dataset
         S = None
         print("CBF started")
+
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm_2()
+        icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
         # icm = self.applytfidf(icm)
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.5)
-        print("SHAPE of ICM: ", icm.shape)
+        icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
                                             for x in self.tr_id_list]],
                            icm,
                            k_filtering=self.k_filtering,
                            shrinkage=self.shrinkage)
         s_norm = S.sum(axis=1)
+
         # normalize s
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+
         # compute ratings
         print("Similarity matrix ready!")
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
-        # s_norm = S.sum(axis=1)
-        # normalize s
-        # S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
         self.S = S.transpose()
+
         # compute ratings
         R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
-        # eliminate useless columns
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(x)
-                                      # for x in self.tr_id_list]]
         print("R_hat done")
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
                                       for x in self.tr_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
-        # eliminate playlist that are not target, already done, to check
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(
-        #    x) for x in self.tr_id_list]]
-        print("Shape of final matrix: ", R_hat.shape)
         self.R_hat = R_hat
 
     def getW(self):
