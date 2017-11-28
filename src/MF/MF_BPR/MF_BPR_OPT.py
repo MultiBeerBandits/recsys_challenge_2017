@@ -8,6 +8,9 @@ from src.MF.MF_BPR.MF_BPR import MF_BPR
 # Logging stuff
 import logging
 
+# Params
+# MAP@5: 0.0401673829450349 Current params [2, 0.01, 0.001, 0.001, 0.005]
+
 # write log to file, filemode = 'w' tells to write each time a new file
 logging.basicConfig(filename='MF_BPR.log',
                     format='%(asctime)s %(message)s',
