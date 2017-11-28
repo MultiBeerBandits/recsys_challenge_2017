@@ -196,7 +196,7 @@ class Dataset():
                     #     icm[album_index, track_index] = self.album_weight
                     # add the None album of that artist
                     album_index = self.track_attr_mapper['album'][artist_id]
-                         icm[album_index, track_index] = self.album_weight
+                    icm[album_index, track_index] = self.album_weight
                 for album in albums:
                     album_index = self.track_attr_mapper['album'][album]
                     icm[album_index, track_index] = self.album_weight

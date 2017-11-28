@@ -9,11 +9,6 @@ from src.utils.matrix_utils import cluster_per_n_rating
 
 
 def main():
-    # best_map = 0
-    # best_album_w = 0
-    # best_artist_w = 0
-    # shr_w = 100
-    # k_f = 50
     ds = Dataset(load_tags=True, filter_tag=True)
     ds.set_track_attr_weights(1, 0.9, 0.2, 0.2, 0.2, 0.2, 0.2)
     ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
