@@ -194,13 +194,9 @@ class Dataset():
                         album = self.album_artist[artist_id][np.argmax(self.album_artist_counter[artist_id])]
                         album_index = self.track_attr_mapper['album'][album]
                         icm[album_index, track_index] = self.album_weight
-                        album_artist_index = self.track_attr_mapper['artist_album'][artist_id][album]
-                        icm[album_artist_index, track_index] = self.artist_album_weight - 0.1
                 for album in albums:
                     album_index = self.track_attr_mapper['album'][album]
                     icm[album_index, track_index] = self.album_weight
-                    album_artist_index = self.track_attr_mapper['artist_album'][artist_id][album]
-                    icm[album_artist_index, track_index] = self.artist_album_weight
                 # load tags only if specified
                 if self.load_tags:
                     # tags
@@ -848,12 +844,12 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
             else:
                 mapper['tags'][v] = attr_index
                 attr_index += 1
-    for k in album_art.keys():
-        for album in album_art[k]:
-            if k not in mapper['artist_album'].keys():
-                mapper['artist_album'][k] = {}
-            mapper['artist_album'][k][album] = attr_index
-            attr_index += 1
+    # for k in album_art.keys():
+    #     for album in album_art[k]:
+    #         if k not in mapper['artist_album'].keys():
+    #             mapper['artist_album'][k] = {}
+    #         mapper['artist_album'][k][album] = attr_index
+    #         attr_index += 1
 
     #  Divide duration and playcount in cluster
     dataset.duration_cluster = KMeans(

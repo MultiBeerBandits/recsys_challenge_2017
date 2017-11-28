@@ -10,12 +10,9 @@ from src.ML.CSLIM_parallel import SLIM
 
 class SimEnsemble():
     """Results:
-    0,027 with 100, 50, 1e-6, 40
-    0,033 with 100, 50, 1e-4, 400
-    0.049 with 200, 50, 1e-4, 400
-    0.051 with 200, 50, 1e-4, 800
-    0.073 with 500, 50, 1e-4, 800
-    0.071 with 500, 50, 1e-5, 800
+    CBF: 0.0894016109977729
+    IBF: 0.336234124300068
+    CSLIM: 0.40035618284750263
     """
 
     def __init__(self):

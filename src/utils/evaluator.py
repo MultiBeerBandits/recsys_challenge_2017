@@ -132,13 +132,16 @@ class Evaluator(object):
                         relevant_items += 1
                         precision = relevant_items / item_number
                         ap = ap + precision
+                    else:
+                        if tr_id not in self.target_tracks[self.current_fold_index]:
+                            print("WARNING: Track not in target tracks!")
                     item_number += 1
                 # save the map@5 into the dictionary
                 self.map_playlists[pl_id] = ap / 5
                 cumulated_ap = cumulated_ap + (ap / 5)
             map_at_five = cumulated_ap / \
                 len(self.test_dictionaries[self.current_fold_index].keys())
-            print("MAP@5: " + str(map_at_five))
+            print("MAP@5: " + str(map_at_five), flush=True)
             self.evaluations[self.current_fold_index] = map_at_five
             return map_at_five
 
@@ -154,7 +157,10 @@ class Evaluator(object):
         mpc = np.zeros(n_clusters)
 
         for i in range(n_clusters):
-            mpc[i] = np.mean(maps[clusters == i])
+            if len(maps[clusters == i]) == 0:
+                mpc[i] = 0
+            else:
+                mpc[i] = np.mean(maps[clusters == i])
 
         return mpc
 

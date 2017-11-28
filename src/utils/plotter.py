@@ -282,6 +282,8 @@ def plot_num_rating():
 
 def visualize_2d(x, y, x_label, y_label, title):
     fig, ax = plt.subplots()
+    plt.axis([0, len(x), 0, 0.3])
+    plt.grid(True)
     ax.scatter(x, y)
     plt.ylabel(y_label)
     plt.xlabel(x_label)
