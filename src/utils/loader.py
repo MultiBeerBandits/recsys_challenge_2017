@@ -195,7 +195,9 @@ class Dataset():
                     #     album_index = self.track_attr_mapper['album'][album]
                     #     icm[album_index, track_index] = self.album_weight
                     # add the None album of that artist
-                    album_index = self.track_attr_mapper['album'][artist_id+'NONE']
+                    if row['track_id'] in self.target_tracks:
+                        print("eheh")
+                    album_index = self.track_attr_mapper['album']['NONE']
                     icm[album_index, track_index] = self.album_weight
                 for album in albums:
                     album_index = self.track_attr_mapper['album'][album]
@@ -838,9 +840,11 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
         mapper['album'][v] = attr_index
         attr_index += 1
     # add artist values to album to represent None album of each artist
-    for v in attrs['artist_id']:
-        mapper['album'][v+'NONE'] = attr_index
-        attr_index += 1
+    # for v in attrs['artist_id']:
+    #     mapper['album'][v+'NONE'] = attr_index
+    #     attr_index += 1
+    mapper['album']['NONE'] = attr_index
+    attr_index += 1
     # load tags only if specified and only if higher than pop threshold
     if load_tags:
         for v in attrs['tags']:
