@@ -64,7 +64,10 @@ class ContentBasedFiltering(BaseRecommender):
         urm_n = urm.sum(axis=1)
         urm_n[urm_n < 10] = 0
         urm_n[urm_n >= 10] = 1
+
+        print(urm_n.shape)
         urm = urm.multiply(urm_n)
+
         icm = dataset.add_playlist_to_icm(icm, urm, 0.8)
 
         # Tfidf
