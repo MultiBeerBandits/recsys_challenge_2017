@@ -1,13 +1,13 @@
 # Optimize Content Based Filtering by weight selection
 
-from skopt import forest_minimize
+from skopt import forest_minimize, gbrt_minimize
 from skopt.space import Integer
 from scipy.sparse import *
 from src.ML.CSLIM_parallel import *
 from src.utils.loader import *
 from src.utils.evaluator import *
 import numpy as np
-from src.CBF.CBF_augmented import ContentBasedFiltering
+from src.CBF.CBF import ContentBasedFiltering
 # Logging stuff
 import logging
 
@@ -24,28 +24,37 @@ logging.basicConfig(filename='cbf_param.log',
                     filemode='w',
                     level=logging.DEBUG)
 
+ds = Dataset(load_tags=True, filter_tag=True)
 
 def objective(params):
-    artist, album, duration_tracks, playcount, tags, n_rating, created_at, owner, title, duration_playlist, alfa = params
+
+    global ds
+
+    # unpack params
+    artist, album, inferred_album, duration_tracks, inferred_duration, playcount, inferred_playcount, tags, n_rating, urm_weight = params
 
     print("Current params", str(params))
-    # get the current fold
-    ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(artist / 100,
-                              album / 100, duration_tracks / 100,
-                              playcount / 100,
-                              tags / 100,
-                              n_rating / 100)
-    ds.set_playlist_attr_weights(created_at / 100, owner / 100, title / 100, duration_playlist / 100)
+
+    # set weights
+    ds.set_track_attr_weights_2(artist / 100,
+                                album / 100, duration_tracks / 100,
+                                playcount / 100,
+                                tags / 100,
+                                n_rating / 100,
+                                inferred_album / 100,
+                                inferred_duration / 100,
+                                inferred_playcount / 100)
+
     ev = Evaluator()
-    ev.cross_validation(4, ds.train_final.copy())
-    urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-    cbf = ContentBasedFiltering(alfa / 100)
-    cbf.fit(urm, tg_playlist, tg_tracks, ds)
-    recs = cbf.predict()
-    map_at_five = ev.evaluate_fold(recs)
+    ev.cross_validation(3, ds.train_final.copy())
+    for i in range(3):
+        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+        cbf = ContentBasedFiltering()
+        cbf.fit(urm, tg_playlist, tg_tracks, ds, urm_weight=urm_weight/100)
+        recs = cbf.predict()
+        map_at_five = ev.evaluate_fold(recs)
     # Make negative because we want to _minimize_ objective
-    out = -map_at_five
+    out = -ev.get_mean_map()
 
     return out
 
@@ -58,25 +67,24 @@ def result(res):
 def opt_content_based():
     space = [Integer(0, 100),  # artist
              Integer(0, 100),  # album
+             Integer(0, 100),  # inferred album
              Integer(0, 100),  # duration_tracks
+             Integer(0, 100),  # inferred duration
              Integer(0, 100),  # playcount
+             Integer(0, 100),  # inferred playcount
              Integer(0, 100),  # tags
              Integer(0, 100),  # n_rating
-             Integer(0, 100),  # created_at
-             Integer(0, 100),  # owner
-             Integer(0, 100),  # title
-             Integer(0, 100),  # duration_playlist
-             Integer(0, 100)   # mix parameter, value of S_cbf
+             Integer(0, 100),  # urm weight
              ]
 
-    x0 = [100, 90, 20, 20, 20, 0, 50, 50, 50, 50, 97]
+    x0 = [100, 90, 80, 20, 10, 20, 10, 10, 10, 50]
 
-    res = forest_minimize(objective, space, x0=x0, verbose=True,
-                          n_random_starts=20, n_calls=1000, n_jobs=-1,
-                          callback=result)
+    res = gbrt_minimize(objective, space, x0=x0, verbose=True,
+                        n_random_starts=20, n_calls=10000, n_jobs=-1,
+                        callback=result)
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
-    params = ['CBF', 'IBF', 'CSLIM']
+    params = ['Artist', 'Album', 'inferred_album', 'duration_tracks', 'inferred_duration', 'playcount', 'inferred_playcount', 'tags', 'n_rating', 'urm_weight']
     for (p, x_) in zip(params, res.x):
       print('{}: {}'.format(p, x_))
 

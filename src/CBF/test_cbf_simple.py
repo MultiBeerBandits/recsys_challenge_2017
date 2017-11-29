@@ -2,20 +2,15 @@ from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
 import numpy as np
-from src.CBF.CBF_4 import *
+from src.CBF.CBF import *
 from itertools import product
 from src.utils.plotter import visualize_2d
 from src.utils.matrix_utils import cluster_per_n_rating
 
 
 def main():
-    # best_map = 0
-    # best_album_w = 0
-    # best_artist_w = 0
-    # shr_w = 100
-    # k_f = 50
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 0, 1, 1, 1, 1, 1)
+    ds.set_track_attr_weights(1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1)
     ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
