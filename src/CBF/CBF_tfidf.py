@@ -46,6 +46,7 @@ class ContentBasedFiltering(BaseRecommender):
         self.tr_id_list = list(target_tracks)
         self.dataset = dataset
         S = None
+        urm = urm.tocsr()
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm_2()
@@ -53,11 +54,11 @@ class ContentBasedFiltering(BaseRecommender):
         # aggregate tags
         icm_tag = dataset.build_tag_matrix(icm)
         print("Aggregating tags features")
-        # icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
+        icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
         # icm_tag_aggr2 = aggregate_features(icm_tag, 2, 30)
 
         # stack all
-        # icm = vstack([icm, icm_tag_aggr], format='csr')
+        icm = vstack([icm, icm_tag_aggr], format='csr')
 
         # add urm
         # filter urm, keep only playlist with at least 10 songs
@@ -66,9 +67,9 @@ class ContentBasedFiltering(BaseRecommender):
         urm_n[urm_n >= 10] = 1
 
         print(urm_n.shape)
-        urm = urm.multiply(urm_n)
+        urm_filtered = urm.multiply(urm_n)
 
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.8)
+        icm = dataset.add_playlist_to_icm(icm, urm_filtered, 0.8)
 
         # Tfidf
         icm = csr_matrix(TfidfTransformer(norm='l1').fit_transform(icm.transpose()).transpose())

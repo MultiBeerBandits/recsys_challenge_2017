@@ -56,10 +56,10 @@ class ContentBasedFiltering(BaseRecommender):
         # aggregate tags
         icm_tag = dataset.build_tag_matrix(icm)
         print("Aggregating tags features")
-        # icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
+        icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
 
         # stack all
-        # icm = vstack([icm, icm_tag_aggr], format='csr')
+        icm = vstack([icm, icm_tag_aggr], format='csr')
 
         # add urm
         icm = dataset.add_playlist_to_icm(icm, urm, 0.7)
