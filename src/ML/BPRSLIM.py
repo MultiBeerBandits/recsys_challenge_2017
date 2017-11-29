@@ -347,7 +347,7 @@ def _testAverage(n_training):
     # test_urm = ev.get_test_matrix(0, ds)
     icm = ds.build_icm()
 
-    recommender = ParallelizedBPRSLIM(epochs=15,
+    recommender = ParallelizedBPRSLIM(epochs=20,
                                       epochMultiplier=0.5,
                                       sgd_mode='adagrad',
                                       learning_rate=5e-08,
