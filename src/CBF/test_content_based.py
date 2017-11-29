@@ -25,7 +25,7 @@ def main():
 
         # call fit on mf bpr
         for epoch in range(50):
-            mf.fit(R_hat, ds, list(tg_playlist), list(tg_tracks), n_epochs=1, no_components=200, epoch_multiplier=0.2, l_rate=1e-2)
+            mf.fit(R_hat, ds, list(tg_playlist), list(tg_tracks), n_epochs=1, no_components=500, epoch_multiplier=2, l_rate=1e-2)
             recs = mf.predict_dot_custom(urm)
             ev.evaluate_fold(recs)
 

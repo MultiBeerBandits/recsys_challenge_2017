@@ -93,7 +93,7 @@ class ContentBasedFiltering(BaseRecommender):
         R_hat.eliminate_zeros()
 
         # add twenty ratings for each user
-        R_hat = top_k_filtering(R_hat, 200)
+        R_hat = top_k_filtering(R_hat, 20)
 
         # re add initial ratings
         R_hat[urm.nonzero()] = 1

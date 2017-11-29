@@ -28,7 +28,7 @@ class MF_BPR():
             self.runCompilationScript()
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=1, user_reg=1e-1, pos_item_reg=1e-2, neg_item_reg=1e-2, l_rate=5e-3, epoch_multiplier=5):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=1, user_reg=1e-2, pos_item_reg=1e-2, neg_item_reg=1e-3, l_rate=5e-1, epoch_multiplier=5):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         self.dataset = dataset
@@ -71,7 +71,8 @@ class MF_BPR():
                                                    user_reg=user_reg,
                                                    positive_reg=pos_item_reg,
                                                    negative_reg=neg_item_reg,
-                                                   epoch_multiplier=epoch_multiplier)
+                                                   epoch_multiplier=epoch_multiplier,
+                                                   opt_mode='rmse')
 
 
         # start learning
