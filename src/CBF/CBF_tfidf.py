@@ -62,9 +62,8 @@ class ContentBasedFiltering(BaseRecommender):
         # add urm
         # filter urm, keep only playlist with at least 10 songs
         urm_n = urm.sum(axis=1)
-        urm_n = urm_n[urm_n >= 10]
-        urm_filtered = urm.multiply(urm_n)
-        icm = dataset.add_playlist_to_icm(icm, urm_filtered, 0.8)
+        urm = urm[urm_n >= 10]
+        icm = dataset.add_playlist_to_icm(icm, urm, 0.8)
 
         # Tfidf
         icm = csr_matrix(TfidfTransformer(norm='l1').fit_transform(icm.transpose()).transpose())

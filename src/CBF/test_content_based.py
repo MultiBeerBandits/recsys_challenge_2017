@@ -46,7 +46,7 @@ def main():
     map_at_five = ev.get_mean_map()
     print(map_at_five)
 
-def predict(R_hat, target_playlist, target_tracks):
+def predict(R_hat, target_playlist, target_tracks, at=5):
     """
     returns a dictionary of
     'pl_id': ['tr_1', 'tr_at'] for each playlist in target playlist
@@ -60,7 +60,7 @@ def predict(R_hat, target_playlist, target_tracks):
         sorted_row_idx = np.flip(pl_row.argsort(), axis=0)[0:at]
         track_cols = [R_hat.indices[R_hat.indptr[i] + x]
                       for x in sorted_row_idx]
-        tracks_ids = [tr_id_list[x] for x in track_cols]
+        tracks_ids = [target_tracks[x] for x in track_cols]
         recs[pl_id] = tracks_ids
     return recs
 
