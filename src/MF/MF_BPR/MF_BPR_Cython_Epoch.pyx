@@ -426,7 +426,7 @@ cdef class MF_BPR_Cython_Epoch:
 
 
 
-            if((numCurrentBatch%500000==0 and not numCurrentBatch==0) or numCurrentBatch==totalNumberOfBatch-1):
+            if((numCurrentBatch%5000000==0 and not numCurrentBatch==0) or numCurrentBatch==totalNumberOfBatch-1):
                 print("Processed {} ( {:.2f}% ) in {:.2f} seconds. Sample per second: {:.0f}".format(
                     numCurrentBatch*self.batch_size,
                     100.0* float(numCurrentBatch*self.batch_size)/self.numPositiveIteractions,

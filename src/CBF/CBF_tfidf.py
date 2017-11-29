@@ -54,17 +54,17 @@ class ContentBasedFiltering(BaseRecommender):
         # aggregate tags
         icm_tag = dataset.build_tag_matrix(icm)
         print("Aggregating tags features")
-        icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
-        # icm_tag_aggr2 = aggregate_features(icm_tag, 2, 30)
+        icm_tag_aggr = aggregate_features(icm_tag, 3, 30)
+        icm_tag_aggr2 = aggregate_features(icm_tag, 2, 50)
 
         # stack all
-        icm = vstack([icm, icm_tag_aggr], format='csr')
+        icm = vstack([icm, icm_tag_aggr, icm_tag_aggr2], format='csr')
 
         # add urm
         # filter urm, keep only playlist with at least 10 songs
         urm_n = urm.sum(axis=1)
-        urm_n[urm_n < 10] = 0
-        urm_n[urm_n >= 10] = 1
+        urm_n[urm_n < 5] = 0
+        urm_n[urm_n >= 5] = 1
 
         print(urm_n.shape)
         urm_filtered = urm.multiply(urm_n)
