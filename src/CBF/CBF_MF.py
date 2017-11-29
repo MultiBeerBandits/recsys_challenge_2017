@@ -9,9 +9,17 @@ from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.BaseRecommender import BaseRecommender
 
 
+
 class ContentBasedFiltering(BaseRecommender):
 
-    def __init__(self, shrinkage=10, k_filtering=200):
+    """
+    Good conf: tag aggr 3,10; tfidf l1 norm over all matrix
+    MAP@5  0.11772497678137457 with 10 shrinkage, 100 k_filtering and other as before
+    MAP@5  0.12039006297936491 urm weight 0.7
+    MAP@5  0.12109109578826009 without playcount and duration
+    """
+
+    def __init__(self, shrinkage=10, k_filtering=100):
         # final matrix of predictions
         self.R_hat = None
 
@@ -23,7 +31,7 @@ class ContentBasedFiltering(BaseRecommender):
         self.shrinkage = shrinkage
         self.k_filtering = k_filtering
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, urm_weight=0.4):
+    def fit(self, urm, target_playlist, target_tracks, dataset):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -41,33 +49,57 @@ class ContentBasedFiltering(BaseRecommender):
         S = None
         print("CBF started")
 
+        print("Initial density: ", urm.nnz/(urm.shape[0]*urm.shape[1]))
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm_2()
-        icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
-        icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
-        S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
-                                            for x in self.tr_id_list]],
+
+        # aggregate tags
+        icm_tag = dataset.build_tag_matrix(icm)
+        print("Aggregating tags features")
+        # icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
+
+        # stack all
+        # icm = vstack([icm, icm_tag_aggr], format='csr')
+
+        # add urm
+        icm = dataset.add_playlist_to_icm(icm, urm, 0.7)
+
+        # Tfidf
+        icm = csr_matrix(TfidfTransformer(norm='l1').fit_transform(icm.transpose()).transpose())
+        # idf = icm_ones.sum(axis=1)
+        # idf = np.reciprocal(idf)
+        # idf = np.multiply(idf, icm.shape[1])
+        # idf = np.log(idf)
+
+        # icm = csr_matrix(icm.multiply(idf))
+
+        print("Tfidf done: ", icm.shape)
+        S = compute_cosine(icm.transpose(),
                            icm,
                            k_filtering=self.k_filtering,
                            shrinkage=self.shrinkage)
         s_norm = S.sum(axis=1)
-
         # normalize s
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
-
         # compute ratings
         print("Similarity matrix ready!")
-        urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
-                           for x in self.pl_id_list]]
-        self.S = S.transpose()
 
+        self.S = S.transpose()
         # compute ratings
-        R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
-        print("R_hat done")
-        urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
-                                      for x in self.tr_id_list]]
-        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat = urm.dot(S.transpose().tocsc()).tocsr()
+
+        # keep only top n ratings of the prediction
+        R_hat[urm.nonzero()] = 0
         R_hat.eliminate_zeros()
+
+        # add twenty ratings for each user
+        R_hat = top_k_filtering(R_hat, 200)
+
+        # re add initial ratings
+        R_hat[urm.nonzero()] = 1
+
+        print("Density of final matrix: ", R_hat.nnz/(R_hat.shape[0]*R_hat.shape[1]))
+
         self.R_hat = R_hat
 
     def getW(self):

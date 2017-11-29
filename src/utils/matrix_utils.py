@@ -1,6 +1,7 @@
 import scipy.sparse as sps
 import numpy as np
 from sklearn.cluster import KMeans
+from src.utils.loader import *
 
 
 def top_k_filtering(matrix, topK):
@@ -298,3 +299,12 @@ def writeSubmission(fileName, recs, tg_playlist):
                 track_ids = track_ids + r + ' '
             writer.writerow({'playlist_id': k,
                              'track_ids': track_ids[:-1]})
+
+
+def write_icm_to_file():
+    dataset = Dataset(load_tags=True, filter_tag=True)
+    dataset.writeICM('new_icm.csv')
+
+
+if __name__ == '__main__':
+    write_icm_to_file()

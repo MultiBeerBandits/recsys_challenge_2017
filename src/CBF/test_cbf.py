@@ -2,7 +2,7 @@ from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
 import numpy as np
-from src.CBF.CBF_tfidf import *
+from src.CBF.CBF import *
 from itertools import product
 from src.utils.plotter import visualize_2d
 from src.utils.matrix_utils import cluster_per_n_rating
@@ -10,9 +10,7 @@ from src.utils.matrix_utils import cluster_per_n_rating
 
 def main():
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights_2(1, 1, 0, 0, 1, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
-
-    # ds.set_track_attr_weights_2(1, 1, 1, 1, 1, num_rating_weight=1, inferred_album=1, inferred_duration=1, inferred_playcount=1)
+    ds.set_track_attr_weights_2(1, 0.9, 0.2, 0.2, 0.2, num_rating_weight=0.1, inferred_album=0.8, inferred_duration=0.2, inferred_playcount=0.2)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()

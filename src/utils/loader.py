@@ -158,9 +158,9 @@ class Dataset():
                     # duration_offset = np.digitize(duration, self.duration_bins) - 1
                     # get the cluster
                     duration_offset = self.duration_cluster[duration_index]
-                    duration_index = self.track_attr_mapper['duration'] + \
+                    duration_index_icm = self.track_attr_mapper['duration'] + \
                         duration_offset
-                    icm[duration_index, track_index] = self.duration_weight
+                    icm[duration_index_icm, track_index] = self.duration_weight
                     # go ahead with duration index
                     duration_index += 1
                 # playcount
@@ -173,9 +173,9 @@ class Dataset():
                     # playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
                     # get the cluster
                     playcount_offset = self.playcount_cluster[playcount_index]
-                    playcount_index = self.track_attr_mapper['playcount'] + \
+                    playcount_index_icm = self.track_attr_mapper['playcount'] + \
                         playcount_offset
-                    icm[playcount_index, track_index] = self.playcount_weight
+                    icm[playcount_index_icm, track_index] = self.playcount_weight
                     playcount_index += 1
         return csr_matrix(icm)
 
@@ -218,37 +218,37 @@ class Dataset():
                     for tag in tags:
                         if tag in self.track_attr_mapper['tags']:
                             tag_index = self.track_attr_mapper['tags'][tag]
-                            tag_weight = self.tag_counter[tag] * \
-                                self.tags_weight
-                            icm[tag_index, track_index] = tag_weight
+                            # tag_weight = self.tag_counter[tag] * \
+                            #    self.tags_weight
+                            icm[tag_index, track_index] = self.tags_weight
 
                 # duration
                 # get the clusters
                 duration_offset = self.duration_cluster[duration_index]
-                duration_index = self.track_attr_mapper['duration'] + \
+                duration_index_icm = self.track_attr_mapper['duration'] + \
                     duration_offset
 
                 # select what weight to use
                 duration = row['duration']
                 if duration is not None and duration != '' and float(duration) != -1:
-                    icm[duration_index, track_index] = self.duration_weight
+                    icm[duration_index_icm, track_index] = self.duration_weight
                 else:
-                    icm[duration_index, track_index] = self.inferred_duration_weight
+                    icm[duration_index_icm, track_index] = self.inferred_duration_weight
                 # go ahead with duration index
                 duration_index += 1
                 # playcount
                 # playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
                 # get the cluster
                 playcount_offset = self.playcount_cluster[playcount_index]
-                playcount_index = self.track_attr_mapper['playcount'] + \
+                playcount_index_icm = self.track_attr_mapper['playcount'] + \
                     playcount_offset
 
                 # playcount
                 playcount = row['playcount']
                 if playcount is not None and playcount != '' and float(playcount) != -1:
-                    icm[playcount_index, track_index] = self.playcount_weight
+                    icm[playcount_index_icm, track_index] = self.playcount_weight
                 else:
-                    icm[playcount_index, track_index] = self.inferred_playcount_weight
+                    icm[playcount_index_icm, track_index] = self.inferred_playcount_weight
                 playcount_index += 1
         return csr_matrix(icm)
 
@@ -546,6 +546,75 @@ class Dataset():
 
         return ucm
 
+    def writeICM(self, filename, path='./data/tracks_final.csv'):
+        """
+        opens the file in path, gets the attributes index and writes all into filename
+        """
+        index = 0
+        # list of dict containing the tracks
+        tracks = []
+        with open(path, newline='') as csv_file:
+            reader = csv.DictReader(csv_file, delimiter='\t')
+            for row in reader:
+
+                # get index of this track
+                track_index = self.track_id_mapper[row['track_id']]
+
+                # get artist
+                artist_id = row['artist_id']
+                artist_index = self.track_attr_mapper['artist_id'][row['artist_id']]
+
+                # get albums
+                albums = parse_csv_array(row['album'])
+                if len(albums) == 0:
+
+                    # add the None album of that artist
+                    album_ind = self.track_attr_mapper['album'][artist_id + 'NONE']
+
+                for album in albums:
+                    album_ind = self.track_attr_mapper['album'][album]
+
+                # tags
+                tags = parse_csv_array(row['tags'])
+                tags_ind = []
+                for tag in tags:
+                    if tag in self.track_attr_mapper['tags']:
+                        tag_index = self.track_attr_mapper['tags'][tag]
+                        tags_ind.append(tag_index)
+
+                # duration
+                # get the clusters
+                duration_offset = self.duration_cluster[index]
+                duration_index_icm = self.track_attr_mapper['duration'] + \
+                    duration_offset
+
+                # playcount
+                playcount_offset = self.playcount_cluster[index]
+                playcount_index_icm = self.track_attr_mapper['playcount'] + \
+                    playcount_offset
+
+                track = {'track_id':0, 'artist_id':0, 'album':0, 'playcount':0, 'duration':0, 'tags':0}
+                track['track_id'] = row['track_id']
+                track['artist_id'] = artist_index
+                track['album'] = album_ind
+                track['tags'] = tags_ind
+                track['playcount'] = playcount_index_icm
+                track['duration'] = duration_index_icm
+                tracks.append(track)
+
+                index+=1
+
+        # write to csv
+        keys = tracks[0].keys()
+        with open(filename, 'w') as output_file:
+            dict_writer = csv.DictWriter(output_file, keys, delimiter='\t')
+            dict_writer.writeheader()
+            dict_writer.writerows(tracks)
+
+    def loadICM(self, path):
+        # loads the icm and build the tracks mapper
+        pass
+
 
 def load_train_final(path):
     res = {}
@@ -788,7 +857,7 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
     track_index = 0
     # duration and playcount attributes
     durations_ini = []  # array of initial duration for dividing it in bins
-    durations = [] # array of complete durations
+    durations = []      # array of complete durations
     playcounts_ini = []  # the same as before
     playcounts = []  # array of complete playcounts
 
