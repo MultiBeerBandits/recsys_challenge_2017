@@ -112,7 +112,7 @@ cdef class MF_BPR_Cython_Epoch:
 
     def __init__(self, URM_mask, eligibleUsers, num_factors, target_users=None, target_items=None,
                  learning_rate = 0.05, user_reg = 0.0, positive_reg = 0.0, negative_reg = 0.0,
-                 batch_size = 1, sgd_mode='sgd', epoch_multiplier=1.0, opt_mode='bpr'):
+                 batch_size = 1, sgd_mode='sgd', epoch_multiplier=1.0, opt_mode='bpr', W=None, H=None):
 
         super(MF_BPR_Cython_Epoch, self).__init__()
 
@@ -130,9 +130,15 @@ cdef class MF_BPR_Cython_Epoch:
         self.row_nnz = np.diff(URM_mask.indptr).astype(np.int64)
         self.row_indices = np.repeat(np.arange(self.n_users), self.row_nnz).astype(np.int64)
 
-        # W and H cannot be initialized as zero, otherwise the gradient will always be zero
-        self.W = np.multiply(np.random.random((self.n_users, self.num_factors)), 0.1) # it was 0.1
-        self.H = np.multiply(np.random.random((self.n_items, self.num_factors)), 0.1)
+        if W is None:
+            # W and H cannot be initialized as zero, otherwise the gradient will always be zero
+            # self.W = np.multiply(np.random.random((self.n_users, self.num_factors)), 0.1) # it was 0.1
+            self.W = np.random.normal(0, 0.1, (self.n_users, self.num_factors))
+            self.H = np.random.normal(0, 0.1, (self.n_items, self.num_factors))
+        
+        else:
+            self.W = W
+            self.H = H 
 
         # select optimization mode
         if opt_mode=='bpr':
@@ -236,6 +242,7 @@ cdef class MF_BPR_Cython_Epoch:
         cdef double sigmoid_i, sigmoid_u, sigmoid_j
         cdef double update_u, update_i, update_j
         cdef double gtu, gti, gtj
+        cdef double loss
 
 
         cdef long start_time_epoch = time.time()
@@ -264,6 +271,8 @@ cdef class MF_BPR_Cython_Epoch:
 
         if self.useRMSE:
             self.shuffled_idx = np.random.permutation(self.urm_nnz).astype(np.int64)
+
+        loss = 0.0
 
         for numCurrentBatch in range(totalNumberOfBatch):
 
@@ -303,6 +312,7 @@ cdef class MF_BPR_Cython_Epoch:
 
             if self.useRMSE:
                 error = rui - x_uij 
+                loss += error ** 2
 
 
             # Use gradient of log(sigm(-x_uij))
@@ -401,8 +411,8 @@ cdef class MF_BPR_Cython_Epoch:
                     W_u = self.W[u, index]
 
                     # calculate gradients
-                    gtu = (error * ( H_i ) + self.user_reg * W_u)
-                    gti = (error * ( W_u ) + self.positive_reg * H_i)
+                    gtu = (error * ( - H_i ) + self.user_reg * W_u)
+                    gti = (error * ( - W_u ) + self.positive_reg * H_i)
 
                     # update of U params
                     update_u = self.get_adam_update_user(gtu, u, index)
@@ -427,6 +437,9 @@ cdef class MF_BPR_Cython_Epoch:
                 sys.stderr.flush()
 
                 start_time_batch = time.time()
+
+        if self.useRMSE:
+            print("Loss: ", loss)
 
 
     def get_W(self):

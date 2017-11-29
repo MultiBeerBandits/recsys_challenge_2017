@@ -218,9 +218,9 @@ class Dataset():
                     for tag in tags:
                         if tag in self.track_attr_mapper['tags']:
                             tag_index = self.track_attr_mapper['tags'][tag]
-                            # tag_weight = self.tag_counter[tag] * \
-                            #    self.tags_weight
-                            icm[tag_index, track_index] = self.tags_weight
+                            tag_weight = self.tag_counter[tag] * \
+                                self.tags_weight
+                            icm[tag_index, track_index] = tag_weight
 
                 # duration
                 # get the clusters
