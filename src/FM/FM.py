@@ -49,7 +49,7 @@ class FM(BaseRecommender):
         n_cols = urm.shape[0] + urm.shape[1] + icm.shape[0]
         n_rows = 2 * urm.nnz
 
-        M = coo_matrix((n_rows, n_cols))
+        M = lil_matrix((n_rows, n_cols))
 
         # better to have coo matrix for building model for FM
         urm_coo = urm.tocoo()
@@ -115,7 +115,7 @@ class FM(BaseRecommender):
 
         n_rows_test = n_tg_user * n_tg_items
 
-        X_test = coo_matrix((n_rows_test, n_cols))
+        X_test = lil_matrix((n_rows_test, n_cols))
 
         tg_pl_index = [dataset.get_playlist_index_from_id(x)
                        for x in self.pl_id_list]
