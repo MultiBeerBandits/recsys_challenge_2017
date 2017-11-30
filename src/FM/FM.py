@@ -21,9 +21,6 @@ class FM(BaseRecommender):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-        self.shrinkage = shrinkage
-        self.k_filtering = k_filtering
-
     def fit(self, urm, target_playlist, target_tracks, dataset):
         """
         urm: user rating matrix
