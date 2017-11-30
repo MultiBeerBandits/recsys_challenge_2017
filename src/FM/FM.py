@@ -38,6 +38,7 @@ class FM(BaseRecommender):
         self.dataset = dataset
 
         print("FM started")
+        urm = urm.tocsr()
 
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm_2().tocsc()
