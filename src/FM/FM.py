@@ -114,6 +114,13 @@ class FM(BaseRecommender):
 
         print("Y done")
 
+        print("Start learning")
+        # start learning
+        fmreg = FMRegression()
+        fmreg.fit(M, y)
+
+        print("Learning finished")
+
         # build x test
         n_tg_user = len(self.pl_id_list)
         n_tg_items = len(self.tr_id_list)
@@ -148,13 +155,6 @@ class FM(BaseRecommender):
             index += 1
 
         X_test = X_test.tocsc()
-
-        print("Start learning")
-        # start learning
-        fmreg = FMRegression()
-        fmreg.fit(M, y)
-
-        print("Learning finished")
         # prediction
         y_test = fmreg.predict(X_test)
 
