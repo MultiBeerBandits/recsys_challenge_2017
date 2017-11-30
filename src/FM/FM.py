@@ -69,7 +69,7 @@ class FM(BaseRecommender):
 
             assert(row_icm.shape[0] == indices.shape[0])
 
-            for j in row_icm.shape[0]:
+            for j in range(row_icm.shape[0]):
                 M[i, indices[j]] = row_icm[j]
 
             if i % 5000 == 0:
@@ -98,7 +98,7 @@ class FM(BaseRecommender):
 
             assert(row_icm.shape[0] == indices.shape[0])
 
-            for j in row_icm.shape[0]:
+            for j in range(row_icm.shape[0]):
                 M[i, indices[j]] = row_icm[j]
 
             if i % 5000 == 0:
@@ -134,7 +134,7 @@ class FM(BaseRecommender):
 
             assert(row_icm.shape[0] == indices.shape[0])
 
-            for j in row_icm.shape[0]:
+            for j in range(row_icm.shape[0]):
                 X_test[index, indices[j]] = row_icm[j]
 
             index += 1
