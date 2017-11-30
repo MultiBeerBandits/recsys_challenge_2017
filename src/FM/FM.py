@@ -73,7 +73,7 @@ class FM(BaseRecommender):
             for j in range(row_icm.shape[0]):
                 M[i, indices[j]] = row_icm[j]
 
-            if i % 500000 == 0:
+            if i % 50000 == 0:
                 print("Done", (i / urm.data.shape[0]) * 100)
 
         # add some zero rating
@@ -104,13 +104,15 @@ class FM(BaseRecommender):
             for j in range(row_icm.shape[0]):
                 M[i, indices[j]] = row_icm[j]
 
-            if i % 500000 == 0:
+            if i % 50000 == 0:
                 print("Done", ((i - urm.nnz) / urm.nnz) * 100)
 
         M = M.tocsc()
 
         y = np.ones(M.shape[0])
         y[urm.nnz:y.shape[0]] = 0
+
+        print("Y done")
 
         # build x test
         n_tg_user = len(self.pl_id_list)
@@ -139,6 +141,9 @@ class FM(BaseRecommender):
 
             for j in range(row_icm.shape[0]):
                 X_test[index, indices[j]] = row_icm[j]
+
+            if index % 50000 == 0:
+                print("Done", ((index) / (len(tg_pl_index)*len(tg_tr_index))) * 100)
 
             index += 1
 
