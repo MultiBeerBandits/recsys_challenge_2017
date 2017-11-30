@@ -67,7 +67,7 @@ class FM(BaseRecommender):
             row_icm = icm.data[icm.indptr[track_index]:icm.indptr[track_index + 1]]
             indices = icm.indices[icm.indptr[track_index]: icm.indptr[track_index + 1]]
 
-            assert(row_icm.shape[0] == indeces.shape[0])
+            assert(row_icm.shape[0] == indices.shape[0])
 
             for j in row_icm.shape[0]:
                 M[i, indices[j]] = row_icm[j]
@@ -96,7 +96,7 @@ class FM(BaseRecommender):
             row_icm = icm.data[icm.indptr[track_index]:icm.indptr[track_index + 1]]
             indices = icm.indices[icm.indptr[track_index]: icm.indptr[track_index + 1]]
 
-            assert(row_icm.shape[0] == indeces.shape[0])
+            assert(row_icm.shape[0] == indices.shape[0])
 
             for j in row_icm.shape[0]:
                 M[i, indices[j]] = row_icm[j]
@@ -132,7 +132,7 @@ class FM(BaseRecommender):
             row_icm = icm.data[icm.indptr[track_index]:icm.indptr[track_index + 1]]
             indices = icm.indices[icm.indptr[track_index]: icm.indptr[track_index + 1]]
 
-            assert(row_icm.shape[0] == indeces.shape[0])
+            assert(row_icm.shape[0] == indices.shape[0])
 
             for j in row_icm.shape[0]:
                 X_test[index, indices[j]] = row_icm[j]
