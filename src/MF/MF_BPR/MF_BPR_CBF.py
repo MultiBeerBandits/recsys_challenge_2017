@@ -5,6 +5,8 @@ from src.utils.evaluator import *
 from src.utils.matrix_utils import top_k_filtering, dot_chunked
 import subprocess
 from src.utils.BaseRecommender import BaseRecommender
+from src.CBF.CBF_MF import *
+from src.MF.MF_BPR.MF_BPR import *
 
 
 # best params: rmsprop, user_reg 1e-1 item_reg 1e-2 l_rate 5e-2 (or 1e-2) epochMult = 5, n_components = 500
