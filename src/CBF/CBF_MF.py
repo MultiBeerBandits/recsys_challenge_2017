@@ -9,6 +9,7 @@ from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.BaseRecommender import BaseRecommender
 
 
+
 class ContentBasedFiltering(BaseRecommender):
 
     """
@@ -47,6 +48,8 @@ class ContentBasedFiltering(BaseRecommender):
         self.dataset = dataset
         S = None
         print("CBF started")
+
+        print("Initial density: ", urm.nnz/(urm.shape[0]*urm.shape[1]))
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm_2()
 
@@ -54,13 +57,12 @@ class ContentBasedFiltering(BaseRecommender):
         icm_tag = dataset.build_tag_matrix(icm)
         print("Aggregating tags features")
         # icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
-        # icm_tag_aggr2 = aggregate_features(icm_tag, 2, 30)
 
         # stack all
         # icm = vstack([icm, icm_tag_aggr], format='csr')
 
         # add urm
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.8)
+        icm = dataset.add_playlist_to_icm(icm, urm, 0.7)
 
         # Tfidf
         icm = csr_matrix(TfidfTransformer(norm='l1').fit_transform(icm.transpose()).transpose())
@@ -72,8 +74,7 @@ class ContentBasedFiltering(BaseRecommender):
         # icm = csr_matrix(icm.multiply(idf))
 
         print("Tfidf done: ", icm.shape)
-        S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
-                                            for x in self.tr_id_list]],
+        S = compute_cosine(icm.transpose(),
                            icm,
                            k_filtering=self.k_filtering,
                            shrinkage=self.shrinkage)
@@ -82,26 +83,23 @@ class ContentBasedFiltering(BaseRecommender):
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
         # compute ratings
         print("Similarity matrix ready!")
-        urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
-                           for x in self.pl_id_list]]
-        # s_norm = S.sum(axis=1)
-        # normalize s
-        # S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+
         self.S = S.transpose()
         # compute ratings
-        R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
-        # eliminate useless columns
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(x)
-                                      # for x in self.tr_id_list]]
-        print("R_hat done")
-        urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
-                                      for x in self.tr_id_list]]
-        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat = urm.dot(S.transpose().tocsc()).tocsr()
+
+        # keep only top n ratings of the prediction
+        R_hat[urm.nonzero()] = 0
         R_hat.eliminate_zeros()
-        # eliminate playlist that are not target, already done, to check
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(
-        #    x) for x in self.tr_id_list]]
-        print("Shape of final matrix: ", R_hat.shape)
+
+        # add twenty ratings for each user
+        R_hat = top_k_filtering(R_hat, 20)
+
+        # re add initial ratings
+        R_hat[urm.nonzero()] = 1
+
+        print("Density of final matrix: ", R_hat.nnz/(R_hat.shape[0]*R_hat.shape[1]))
+
         self.R_hat = R_hat
 
     def getW(self):

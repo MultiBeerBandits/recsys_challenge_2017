@@ -19,35 +19,44 @@ class MF_BPR():
         self.icm_t = None
         self.current_epoch = 0
         self.reset_cache = False
+        self.eligibleUsers = None
+        self.urm = None
+        self.icm = None
+        self.target_users = None
 
         if compile_cython:
             self.runCompilationScript()
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=200, n_epochs=2, user_reg=1e-2, pos_item_reg=1e-3, neg_item_reg=1e-3, l_rate=5e-3, epoch_multiplier=5):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=1, user_reg=1e-2, pos_item_reg=1e-2, neg_item_reg=1e-3, l_rate=5e-1, epoch_multiplier=5):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         self.dataset = dataset
-        self.eligibleUsers = []
-        urm = urm.tocsr()
-        self.urm = urm
-        icm = dataset.build_icm()
-        urm_ext = urm   #vstack([urm, icm], format='csr')
-        for user_id in range(urm_ext.shape[0]):
 
-            start_pos = urm_ext.indptr[user_id]
-            end_pos = urm_ext.indptr[user_id + 1]
+        if self.urm is None:
+            urm = urm.tocsr()
+            self.urm = urm
+            self.icm = dataset.build_icm()
+        urm_ext = self.urm #vstack([urm, self.icm], format='csr')
 
-            numUserInteractions = len(urm_ext.indices[start_pos:end_pos])
+        if self.eligibleUsers is None:
+            self.eligibleUsers = []
+            for user_id in range(urm_ext.shape[0]):
 
-            if numUserInteractions > 0:
-                self.eligibleUsers.append(user_id)
+                start_pos = urm_ext.indptr[user_id]
+                end_pos = urm_ext.indptr[user_id + 1]
 
-        # self.eligibleUsers contains the userID having at least one positive interaction and one item non observed
-        self.eligibleUsers = np.array(self.eligibleUsers, dtype=np.int64)
+                numUserInteractions = len(urm_ext.indices[start_pos:end_pos])
 
-        self.target_users = np.array([dataset.get_playlist_index_from_id(x) for x in tg_playlist], dtype=np.int64)
-        self.target_items = np.array([dataset.get_track_index_from_id(x) for x in tg_tracks], dtype=np.int64)
+                if numUserInteractions > 0:
+                    self.eligibleUsers.append(user_id)
+
+            # self.eligibleUsers contains the userID having at least one positive interaction and one item non observed
+            self.eligibleUsers = np.array(self.eligibleUsers, dtype=np.int64)
+
+        if self.target_users is None:
+            self.target_users = np.array([dataset.get_playlist_index_from_id(x) for x in tg_playlist], dtype=np.int64)
+            self.target_items = np.array([dataset.get_track_index_from_id(x) for x in tg_tracks], dtype=np.int64)
 
         if self.cythonEpoch is None:
             from src.MF.MF_BPR.MF_BPR_Cython_Epoch import MF_BPR_Cython_Epoch
@@ -62,7 +71,8 @@ class MF_BPR():
                                                    user_reg=user_reg,
                                                    positive_reg=pos_item_reg,
                                                    negative_reg=neg_item_reg,
-                                                   epoch_multiplier=epoch_multiplier)
+                                                   epoch_multiplier=epoch_multiplier,
+                                                   opt_mode='rmse')
 
 
         # start learning
@@ -102,6 +112,19 @@ class MF_BPR():
         R_hat = np.dot(W, H.transpose())
 
         urm_cleaned = self.urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat = csr_matrix(R_hat)
+        R_hat = csr_matrix(top_k_filtering(R_hat, 10))
+        return self._predict(R_hat)
+
+    def predict_dot_custom(self, urm, at=5):
+        W = self.W[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        H = self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+        R_hat = np.dot(W, H.transpose())
+
+        urm_cleaned = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
         urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
 
         R_hat[urm_cleaned.nonzero()] = 0

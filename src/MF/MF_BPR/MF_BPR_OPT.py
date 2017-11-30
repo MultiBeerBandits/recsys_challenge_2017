@@ -54,10 +54,10 @@ def opt_mf():
     # Parameter to optimize:
     # components, user_reg, item_reg, l_rate
     space = [Integer(1, 10),   # components
-             Real(1e-8, 0.8),  # user_reg
-             Real(1e-8, 0.8),  # pos_item_reg
-             Real(1e-8, 0.8),  # neg_item_reg
-             Real(1e-4, 1),    # l_rate
+             Real(1e-9, 0.8),  # user_reg
+             Real(1e-9, 0.8),  # pos_item_reg
+             Real(1e-9, 0.8),  # neg_item_reg
+             Real(1e-5, 1),    # l_rate
              ]
     x0 = [2, 1e-2, 1e-3, 1e-3, 5e-3]
     x1 = [3, 1e-2, 1e-3, 1e-2, 5e-3]
