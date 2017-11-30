@@ -1,4 +1,5 @@
 from src.utils.loader import *
+from src.utils.evaluator import Evaluator
 from scipy.sparse import *
 import numpy as np
 from sklearn.feature_extraction.text import TfidfTransformer
