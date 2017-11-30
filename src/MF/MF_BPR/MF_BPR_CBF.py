@@ -36,7 +36,7 @@ class MF_BPR_CBF(BaseRecommender):
 
         # call fit on mf bpr
         # MAP@5: 0.08256503053607782 with 500 factors after 10 epochs
-        self.mf.fit(R_hat, ds, list(tg_playlist), list(tg_tracks), n_epochs=2, no_components=500, epoch_multiplier=2, l_rate=1e-2)
+        self.mf.fit(self.r_hat_aug, ds, list(tg_playlist), list(tg_tracks), n_epochs=2, no_components=500, epoch_multiplier=2, l_rate=1e-2)
 
         # save r-hat
         self.R_hat = self.mf.getR_hat()

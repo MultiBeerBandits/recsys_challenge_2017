@@ -44,7 +44,7 @@ def main():
         for epoch in range(50):
             # MAP@5: 0.08256503053607782 with 500 factors after 10 epochs
             # MAP@5: 0.08594586443489391 with 500 factors afetr 4 epochs no_components=500, epoch_multiplier=2, l_rate=1e-2
-            mf.fit(R_hat, ds, list(tg_playlist), list(tg_tracks), n_epochs=1, no_components=700, epoch_multiplier=1, l_rate=1e-2)
+            mf.fit(R_hat, ds, list(tg_playlist), list(tg_tracks), n_epochs=1, no_components=700, epoch_multiplier=2, l_rate=1e-2)
             recs = mf.predict_dot_custom(urm)
             ev.evaluate_fold(recs)
 
@@ -135,4 +135,4 @@ def _worker_dot_chunked(X, Y, topK, chunksize=1000):
 
 
 if __name__ == '__main__':
-    mainBPR()
+    main()

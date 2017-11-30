@@ -57,9 +57,9 @@ class UBF(BaseRecommender):
 
         # save S
         # compute cosine similarity between users
-        S = compute_cosine(R_hat[[dataset.get_playlist_index_from_id(x)
+        S = compute_cosine(self.r_hat_aug[[dataset.get_playlist_index_from_id(x)
                                             for x in self.pl_id_list]],
-                           R_hat,
+                           self.r_hat_aug,
                            k_filtering=self.k_filtering,
                            shrinkage=self.shrinkage)
         # normalize s
