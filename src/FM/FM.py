@@ -74,9 +74,12 @@ class FM(BaseRecommender):
             for j in row_icm.shape[0]:
                 M[i, indices[j]] = row_icm[j]
 
+            if i % 5000 == 0:
+                print("Done", (i / urm.data.shape[0]) * 100)
+
         # add some zero rating
         # get i and j, check if they are not in nnz of urm
-        for i in range(len(urm.nnz), 2 * len(urm.nnz)):
+        for i in range(urm.nnz, 2 * urm.nnz):
 
             user_index = np.random.choice(range(n_users))
 
@@ -99,6 +102,9 @@ class FM(BaseRecommender):
 
             for j in row_icm.shape[0]:
                 M[i, indices[j]] = row_icm[j]
+
+            if i % 5000 == 0:
+                print("Done", ((i - urm.nnz) / urm.nnz) * 100)
 
         M = M.tocsc()
 

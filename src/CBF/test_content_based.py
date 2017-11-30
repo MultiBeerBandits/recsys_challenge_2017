@@ -25,6 +25,7 @@ def main():
         # get R_hat
         R_hat = cbf.getR_hat()
         # MAP@5: 0.03575133830958298 with 500 factors and ornly urm
+        # 0.04349393048329915 with 1000 factors
         u, s, v = sparsesvd(R_hat.tocsc(), 1000)
         # numpy.dot(ut.T, numpy.dot(numpy.diag(s), vt)
         R_hat_new = csr_matrix(_worker_dot_chunked(np.dot(u.T[[ds.get_playlist_index_from_id(x) for x in list(tg_playlist)]], np.diag(s)), v[:,[ds.get_track_index_from_id(x) for x in list(tg_tracks)]], topK=100))
