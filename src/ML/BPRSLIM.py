@@ -34,10 +34,7 @@ class BPRSLIM():
             print('Compilation complete!')
 
     def fit(self, urm, icm, target_users, target_items, dataset):
-        print('Running fit process. [URM: {}, ICM: {}, '
-              'target_users: {}, target_items: {}]'.format(
-                  urm.shape, icm.shape,
-                  len(target_users), len(target_items)))
+        print('Running fit process.')
         self._store_fit_params(urm, icm, target_users, target_items, dataset)
         if urm is not None:
             self._computeEligibleUsers(urm)
@@ -339,17 +336,19 @@ def _runCompileScript():
 
 def _testAverage(n_training):
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
+    ds.set_track_attr_weights(1, 1, 1, 1, 1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
 
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
     # test_urm = ev.get_test_matrix(0, ds)
     icm = ds.build_icm()
+    print('Preprocessing the ICM...')
+    icm = _prepareICM(icm, ds)
 
-    recommender = ParallelizedBPRSLIM(epochs=20,
+    recommender = ParallelizedBPRSLIM(epochs=300,
                                       epochMultiplier=0.5,
-                                      sgd_mode='adagrad',
+                                      sgd_mode='rmsprop',
                                       learning_rate=5e-08,
                                       topK=300,
                                       urmSamplingChances=1 / 5,
@@ -365,42 +364,70 @@ def _testAverage(n_training):
     ev.evaluate_fold(recs)
 
 
+def _prepareICM(icm, dataset):
+    from sklearn.feature_extraction.text import TfidfTransformer
+    ds = dataset
+    tags = ds.build_tags_matrix()
+    aggr_tags = aggregate_features(tags, 3, 10)
+    extended_icm = sps.vstack((icm, aggr_tags), format='csr')
+    transformer = TfidfTransformer(norm='l1', use_idf=True,
+                                   smooth_idf=True, sublinear_tf=False)
+    # Compute TF-IDF. Returns a (n_items, n_features) matrix
+    tfidf = transformer.fit_transform(extended_icm.transpose())
+    # Keep the top-k features for each item
+    tfidf = top_k_filtering(tfidf, topK=20).tocsr().transpose()
+    tfidf[tfidf.nonzero()] = 1
+    return tfidf
+
+
 def _testSingleRun():
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
-    # ev = Evaluator()
-    # ev.cross_validation(5, ds.train_final.copy())
+    # ds.set_track_attr_weights_2(1, 0.9, 0.2, 0.2, 0.2, 0.1, 0.8, 0.1, 0.1)
+    ds.set_track_attr_weights(1, 1, 0, 0, 1)
+    ev = Evaluator()
+    ev.cross_validation(5, ds.train_final.copy())
 
-    # urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-    # test_urm = ev.get_test_matrix(0, ds)
-    # icm = ds.build_icm()
-
-    # recommender = BPRSLIM(epochs=500,
-    #                       epochMultiplier=0.5,
-    #                       sgd_mode='momentum',
-    #                       learning_rate=5e-08,
-    #                       topK=300,
-    #                       urmSamplingChances=1 / 5,
-    #                       icmSamplingChances=4 / 5)
-    # recommender.set_evaluation_every(1, ev)
-    # recommender.fit(urm.tocsr(),
-    #                 icm.tocsr(),
-    #                 tg_playlist,
-    #                 tg_tracks,
-    #                 ds)
-    urm = ds.build_train_matrix()
+    urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+    print('Building the ICM...')
     icm = ds.build_icm()
-    tg_playlist = list(ds.target_playlists.keys())
-    tg_tracks = list(ds.target_tracks.keys())
+    print('Preprocessing the ICM...')
+    icm = _prepareICM(icm, ds)
 
-    recommender = BPRSLIM(epochs=15,
-                          epochMultiplier=0.5,
-                          sgd_mode='adagrad',
+    recommender = BPRSLIM(epochs=100,
+                          epochMultiplier=1.0,
+                          sgd_mode='rmsprop',
                           learning_rate=5e-08,
                           topK=300,
                           urmSamplingChances=1 / 5,
                           icmSamplingChances=4 / 5)
-    # recommender.set_evaluation_every(1, ev)
+    recommender.set_evaluation_every(10, ev)
+    recommender.fit(urm.tocsr(),
+                    icm.tocsr(),
+                    tg_playlist,
+                    tg_tracks,
+                    ds)
+    recs = recommender.predict()
+    writeSubmission('submission_cslim_bpr.csv', recs, tg_playlist)
+
+
+def _fullRun():
+    ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights(1, 1, 0, 0, 1)
+
+    urm = ds.build_train_matrix()
+    icm = ds.build_icm().tocsr()
+    tg_playlist = list(ds.target_playlists.keys())
+    tg_tracks = list(ds.target_tracks.keys())
+
+    print('Preprocessing the ICM...')
+    icm = _prepareICM(icm, ds)
+    recommender = BPRSLIM(epochs=300,
+                          epochMultiplier=1.0,
+                          sgd_mode='rmsprop',
+                          learning_rate=5e-08,
+                          topK=300,
+                          urmSamplingChances=1 / 5,
+                          icmSamplingChances=4 / 5)
     recommender.fit(urm.tocsr(),
                     icm.tocsr(),
                     tg_playlist,
@@ -420,5 +447,7 @@ if __name__ == '__main__':
 
     if argument == '--testAverage':
         _testAverage(int(sys.argv[2]))
-    elif argument == '--singleRun':
+    elif argument == '--testFold':
         _testSingleRun()
+    elif argument == '--fullRun':
+        _fullRun()
