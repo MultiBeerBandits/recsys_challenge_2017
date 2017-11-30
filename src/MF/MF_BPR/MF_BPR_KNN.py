@@ -17,7 +17,7 @@ class MF_BPR_KNN(BaseRecommender):
         self.r_hat_aug = r_hat_aug
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, n_epochs=2, no_components=500, epoch_multiplier=2, l_rate=1e-2):
+    def fit(self, urm, tg_playlist, tg_tracks, dataset, n_epochs=2, no_components=500, epoch_multiplier=2, l_rate=1e-2):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         self.dataset = dataset
@@ -36,7 +36,7 @@ class MF_BPR_KNN(BaseRecommender):
 
         # call fit on mf bpr
         # MAP@5: 0.08256503053607782 with 500 factors after 10 epochs
-        self.mf.fit(self.r_hat_aug, ds, list(tg_playlist), list(tg_tracks), n_epochs=2,
+        self.mf.fit(self.r_hat_aug, dataset, list(tg_playlist), list(tg_tracks), n_epochs=2,
                     no_components=500, epoch_multiplier=2, l_rate=1e-2)
 
         # save r-hat
