@@ -78,14 +78,16 @@ class FM(BaseRecommender):
 
         # add some zero rating
         # get i and j, check if they are not in nnz of urm
+        user_shuffled = np.random.choice(n_users, urm.nnz, replace=True)
+        index = 0
         for i in range(urm.nnz, 2 * urm.nnz):
 
-            user_index = np.random.choice(range(n_users))
+            user_index = user_shuffled[index]
 
             selected = False
 
             while not selected:
-                track_index = np.random.choice(range(n_items))
+                track_index = np.random.choice(n_items)
 
                 if track_index not in urm.indices[urm.indptr[user_index]: urm.indptr[user_index+1]]:
                     selected = True
