@@ -143,13 +143,16 @@ class FM(BaseRecommender):
 
         X_test = X_test.tocsc()
 
+        print("Start learning")
         # start learning
         fmreg = FMRegression()
         fmreg.fit(M, y)
 
+        print("Learning finished")
         # prediction
         y_test = fmreg.predict(X_test)
 
+        print("prediction finished")
         # build r_hat from y_test
         R_hat = lil_matrix((n_tg_user, n_tg_items))
 
@@ -161,6 +164,8 @@ class FM(BaseRecommender):
             R_hat[user_index] = user_row_filtered
 
             index += 1
+
+        print("R_hat ready")
 
         self.R_hat = R_hat.tocsr()
 
