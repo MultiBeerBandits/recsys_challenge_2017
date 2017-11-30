@@ -53,7 +53,7 @@ cdef class SLIM_BPR_Cython_Epoch:
 
     cdef int[:] M_indices, M_indptr
 
-    cdef S
+    cdef Sparse_Matrix_Tree_CSR S
     cdef M
 
     def __init__(self,
@@ -131,14 +131,14 @@ cdef class SLIM_BPR_Cython_Epoch:
         cdef int numSeenItemsSampledRow
         cdef long i, j
         cdef long index, seenItem, numIteration, itemId
-        cdef float x_uij, gradient
+        cdef double x_uij, gradient, dS_i, dS_j, gradient_i, gradient_j
 
         cdef int numSeenItems
         cdef int printStep = 500000
 
         # Variables for AdaGrad and RMSprop
         cdef double [:] sgd_cache
-        cdef double cacheUpdate
+        cdef double cacheUpdate, cacheUpdate_i, cacheUpdate_j
         cdef float gamma
 
         if self.useAdaGrad:
@@ -146,7 +146,7 @@ cdef class SLIM_BPR_Cython_Epoch:
 
         elif self.rmsprop:
             sgd_cache = np.zeros((self.n_items), dtype=float)
-            gamma = 0.001
+            gamma = 0.9
 
         elif self.momentum:
             sgd_cache = np.zeros((self.n_items), dtype=float)
@@ -178,23 +178,32 @@ cdef class SLIM_BPR_Cython_Epoch:
                 sgd_cache[i] += cacheUpdate
                 sgd_cache[j] += cacheUpdate
 
-                gradient = gradient / (sqrt(sgd_cache[i]) + 1e-8)
+                gradient_i = gradient / (sqrt(sgd_cache[i]) + 1e-8)
+                gradient_j = gradient / (sqrt(sgd_cache[j]) + 1e-8)
+
+                dS_i = self.learning_rate * gradient_i
+                dS_j = self.learning_rate * (-gradient_j)
 
             elif self.rmsprop:
-                cacheUpdate = sgd_cache[i] * gamma + (1 - gamma) * gradient ** 2
+                cacheUpdate_i = sgd_cache[i] * gamma + (1 - gamma) * gradient ** 2
+                cacheUpdate_j = sgd_cache[j] * gamma + (1 - gamma) * gradient ** 2
 
-                sgd_cache[i] += cacheUpdate
-                sgd_cache[j] += cacheUpdate
+                sgd_cache[i] = cacheUpdate_i
+                sgd_cache[j] = cacheUpdate_j
 
-                gradient = gradient / (sqrt(sgd_cache[i]) + 1e-8)
+                gradient_i = gradient / (sqrt(sgd_cache[i]) + 1e-8)
+                gradient_j = gradient / (sqrt(sgd_cache[j]) + 1e-8)
 
-            # Apply momentum and store current variation
-            if self.momentum:
+                dS_i = self.learning_rate * gradient_i
+                dS_j = self.learning_rate * (-gradient_j)
+
+            elif self.momentum:
                 dS_i = self.learning_rate * gradient + gamma * sgd_cache[i]
                 dS_j = self.learning_rate * (-gradient) + gamma * sgd_cache[j]
 
                 sgd_cache[i] = dS_i
-                sgd_cache[j] = dS_j
+                sgd_cache[j] = dS_j                
+            
             else:
                 dS_i = self.learning_rate * gradient
                 dS_j = self.learning_rate * (-gradient)
