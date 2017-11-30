@@ -75,7 +75,8 @@ def mainBPR():
     R_hat = cbf.getR_hat()
 
     print('Building the ICM...')
-    icm = ds.build_icm_2()
+    ds.set_track_attr_weights_2(1, 1, 1, 1, 1, num_rating_weight=1, inferred_album=1, inferred_duration=1, inferred_playcount=1)
+
 
     recommender = BPRSLIM(epochs=100,
                           epochMultiplier=3,

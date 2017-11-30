@@ -118,19 +118,19 @@ def linear_ensemble():
     # augment r_hat
     cbf_aug = CBF_AUG()
     cbf_aug.fit(urm, tg_playlist,
-            tg_tracks,
-            ds)
+                tg_tracks,
+                ds)
 
     # get R_hat
-    R_hat = cbf.getR_hat()
+    r_hat_aug = cbf_aug.getR_hat()
 
     # create all the models
     cbf = ContentBasedFiltering()
     ubf = UBF(r_hat_aug)
-    ibf = IBF(r_hat)
+    ibf = IBF(r_hat_aug)
     pop = Popularity(20)
-    mf_bpr = MF_BPR_CBF(r_hat)
-    mf_bpr_knn = MF_BPR_KNN(r_hat)
+    mf_bpr = MF_BPR_CBF(r_hat_aug)
+    mf_bpr_knn = MF_BPR_KNN(r_hat_aug)
     # bpr = BPRSLIM(epochs=2,
     #               epochMultiplier=10,
     #               sgd_mode='rmsprop',
