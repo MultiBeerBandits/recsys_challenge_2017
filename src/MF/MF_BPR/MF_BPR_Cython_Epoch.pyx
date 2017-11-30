@@ -250,128 +250,174 @@ cdef class MF_BPR_Cython_Epoch:
 
         self.learning_rate = l_rate
 
-        if reset_cache:
-            self.training_step = 0
+        if self.useBPR and self.useAdam:
+            self.epochIteration_Cython_adam(l_rate, reset_cache=reset_cache)
 
-            if self.useAdaGrad:
-                self.sgd_cache = np.zeros((self.n_items), dtype=float)
-                self.sgd_cache_user = np.zeros((self.n_users), dtype=float)
+        else:
 
-            elif self.rmsprop:
-                self.rmsprop_cache_item = np.zeros((self.n_items, self.num_factors), dtype=float)
-                self.rmsprop_cache_user = np.zeros((self.n_users, self.num_factors), dtype=float)
-                self.gamma = 0.9
+            if reset_cache:
+                self.training_step = 0
 
-            # Adam requires
-            elif self.useAdam:
-                self.init_Adam()
+                if self.useAdaGrad:
+                    self.sgd_cache = np.zeros((self.n_items), dtype=float)
+                    self.sgd_cache_user = np.zeros((self.n_users), dtype=float)
 
-            elif self.useAdam2:
-                self.init_Adam2()
+                elif self.rmsprop:
+                    self.rmsprop_cache_item = np.zeros((self.n_items, self.num_factors), dtype=float)
+                    self.rmsprop_cache_user = np.zeros((self.n_users, self.num_factors), dtype=float)
+                    self.gamma = 0.9
 
-        if self.useRMSE:
-            self.shuffled_idx = np.random.permutation(self.urm_nnz).astype(np.int64)
+                # Adam requires
+                elif self.useAdam:
+                    self.init_Adam()
 
-        loss = 0.0
-
-        for numCurrentBatch in range(totalNumberOfBatch):
-
-            if self.useBPR:
-                # Uniform user sampling with replacement
-                sample = self.sampleBatch_Cython()
-
-                u = sample.user
-                i = sample.pos_item
-                j = sample.neg_item
-
-            else:
-                idx = self.shuffled_idx[numCurrentBatch % self.urm_nnz]
-                rui = self.URM_data[idx]
-                # get the row and col indices of x_ij
-                u = self.row_indices[idx]
-                i = self.URM_mask_indices[idx]
-
-            # add training step
-            if self.useAdam or self.useAdam2:
-                self.training_step_users[u] += 1
-                self.training_step_items[i] += 1
-
-                if self.useBPR:
-                    self.training_step_items[j] += 1
-
-
-            x_uij = 0.0
-
-            for index in range(self.num_factors):
-
-                if self.useBPR:
-                    x_uij += self.W[u,index] * (self.H[i,index] - self.H[j,index])
-                
-                else:
-                    x_uij += self.W[u,index] * self.H[i,index]
+                elif self.useAdam2:
+                    self.init_Adam2()
 
             if self.useRMSE:
-                error = rui - x_uij 
-                loss += error ** 2
+                self.shuffled_idx = np.random.permutation(self.urm_nnz).astype(np.int64)
 
+            loss = 0.0
 
-            # Use gradient of log(sigm(-x_uij))
-            sigmoid = 1 / (1 + exp(x_uij))
-            sigmoid_i = sigmoid
-            sigmoid_j = sigmoid
-            sigmoid_u = sigmoid
-
-            #   OLD CODE, YOU MAY TRY TO USE IT
-            # if self.useAdaGrad:
-            #     cacheUpdate = gradient ** 2
-            
-            #     self.sgd_cache[i] += cacheUpdate
-            #     self.sgd_cache[j] += cacheUpdate
-            #     self.sgd_cache_user[u]+= cacheUpdate
-
-            #     gradient_i = gradient / (sqrt(self.sgd_cache[i]) + 1e-8)
-            #     gradient_j = gradient / (sqrt(self.sgd_cache[j]) + 1e-8)
-            #     gradient_u = gradient / (sqrt(self.sgd_cache_user[u]) + 1e-8)
-            
-            # elif self.rmsprop:
-            #     cacheUpdate_i = self.sgd_cache[i] * self.gamma + (1 - self.gamma) * gradient ** 2
-            #     cacheUpdate_j = self.sgd_cache[j] * self.gamma + (1 - self.gamma) * gradient ** 2
-            #     cacheUpdate_u = self.sgd_cache_user[u] * self.gamma + (1 - self.gamma) * gradient ** 2
-            
-            #     self.sgd_cache[i] = cacheUpdate_i
-            #     self.sgd_cache[j] = cacheUpdate_j
-            #     self.sgd_cache_user[u] = cacheUpdate_u
-            
-            #     gradient_i = gradient / (sqrt(self.sgd_cache[i]) + 1e-8)
-            #     gradient_j = gradient / (sqrt(self.sgd_cache[j]) + 1e-8)
-            #     gradient_u = gradient / (sqrt(self.sgd_cache_user[u]) + 1e-8)
-
-            if self.useAdam2:
-                sigmoid_u = self.get_adam_update_user2(sigmoid, u)
-                sigmoid_i = self.get_adam_update_item2(sigmoid, i)
-                sigmoid_j = self.get_adam_update_item2(sigmoid, j)
-
-            elif self.useRmsprop2:
-
-                sigmoid_u = self.get_rmsprop_update_user2(sigmoid, u)
-                sigmoid_i = self.get_rmsprop_update_item2(sigmoid, i)
-                sigmoid_j = self.get_rmsprop_update_item2(sigmoid, j)
-
-            for index in range(self.num_factors):
+            for numCurrentBatch in range(totalNumberOfBatch):
 
                 if self.useBPR:
-                    # Copy original value to avoid messing up the updates
-                    H_i = self.H[i, index]
-                    H_j = self.H[j, index]
-                    W_u = self.W[u, index]
+                    # Uniform user sampling with replacement
+                    sample = self.sampleBatch_Cython()
 
-                    # calculate gradients
-                    gtu = (-sigmoid_u * ( H_i - H_j ) + self.user_reg * W_u)
-                    gti = (-sigmoid_i * ( W_u ) + self.positive_reg * H_i)
-                    gtj = (-sigmoid_j * (-W_u ) + self.negative_reg * H_j)
+                    u = sample.user
+                    i = sample.pos_item
+                    j = sample.neg_item
+
+                else:
+                    idx = self.shuffled_idx[numCurrentBatch % self.urm_nnz]
+                    rui = self.URM_data[idx]
+                    # get the row and col indices of x_ij
+                    u = self.row_indices[idx]
+                    i = self.URM_mask_indices[idx]
+
+                # add training step
+                if self.useAdam or self.useAdam2:
+                    self.training_step_users[u] += 1
+                    self.training_step_items[i] += 1
+
+                    if self.useBPR:
+                        self.training_step_items[j] += 1
 
 
-                    if self.useAdam:
+                x_uij = 0.0
+
+                for index in range(self.num_factors):
+
+                    if self.useBPR:
+                        x_uij += self.W[u,index] * (self.H[i,index] - self.H[j,index])
+                    
+                    else:
+                        x_uij += self.W[u,index] * self.H[i,index]
+
+                if self.useRMSE:
+                    error = rui - x_uij 
+                    loss += error ** 2
+
+
+                # Use gradient of log(sigm(-x_uij))
+                sigmoid = 1 / (1 + exp(x_uij))
+                sigmoid_i = sigmoid
+                sigmoid_j = sigmoid
+                sigmoid_u = sigmoid
+
+                #   OLD CODE, YOU MAY TRY TO USE IT
+                # if self.useAdaGrad:
+                #     cacheUpdate = gradient ** 2
+                
+                #     self.sgd_cache[i] += cacheUpdate
+                #     self.sgd_cache[j] += cacheUpdate
+                #     self.sgd_cache_user[u]+= cacheUpdate
+
+                #     gradient_i = gradient / (sqrt(self.sgd_cache[i]) + 1e-8)
+                #     gradient_j = gradient / (sqrt(self.sgd_cache[j]) + 1e-8)
+                #     gradient_u = gradient / (sqrt(self.sgd_cache_user[u]) + 1e-8)
+                
+                # elif self.rmsprop:
+                #     cacheUpdate_i = self.sgd_cache[i] * self.gamma + (1 - self.gamma) * gradient ** 2
+                #     cacheUpdate_j = self.sgd_cache[j] * self.gamma + (1 - self.gamma) * gradient ** 2
+                #     cacheUpdate_u = self.sgd_cache_user[u] * self.gamma + (1 - self.gamma) * gradient ** 2
+                
+                #     self.sgd_cache[i] = cacheUpdate_i
+                #     self.sgd_cache[j] = cacheUpdate_j
+                #     self.sgd_cache_user[u] = cacheUpdate_u
+                
+                #     gradient_i = gradient / (sqrt(self.sgd_cache[i]) + 1e-8)
+                #     gradient_j = gradient / (sqrt(self.sgd_cache[j]) + 1e-8)
+                #     gradient_u = gradient / (sqrt(self.sgd_cache_user[u]) + 1e-8)
+
+                if self.useAdam2:
+                    sigmoid_u = self.get_adam_update_user2(sigmoid, u)
+                    sigmoid_i = self.get_adam_update_item2(sigmoid, i)
+                    sigmoid_j = self.get_adam_update_item2(sigmoid, j)
+
+                elif self.useRmsprop2:
+
+                    sigmoid_u = self.get_rmsprop_update_user2(sigmoid, u)
+                    sigmoid_i = self.get_rmsprop_update_item2(sigmoid, i)
+                    sigmoid_j = self.get_rmsprop_update_item2(sigmoid, j)
+
+                for index in range(self.num_factors):
+
+                    if self.useBPR:
+                        # Copy original value to avoid messing up the updates
+                        H_i = self.H[i, index]
+                        H_j = self.H[j, index]
+                        W_u = self.W[u, index]
+
+                        # calculate gradients
+                        gtu = (-sigmoid_u * ( H_i - H_j ) + self.user_reg * W_u)
+                        gti = (-sigmoid_i * ( W_u ) + self.positive_reg * H_i)
+                        gtj = (-sigmoid_j * (-W_u ) + self.negative_reg * H_j)
+
+
+                        if self.useAdam:
+
+                            # update of U params
+                            update_u = self.get_adam_update_user(gtu, u, index)
+
+                            # update of I params
+                            update_i = self.get_adam_update_item(gti, i, index)
+
+                            # update of J params
+                            update_j = self.get_adam_update_item(gtj, j, index)
+
+                        elif self.rmsprop:
+
+                            # update of U params
+                            update_u = self.get_rmsprop_update_user(gtu, u, index)
+
+                            # update of I params
+                            update_i = self.get_rmsprop_update_item(gti, i, index)
+
+                            # update of J params
+                            update_j = self.get_rmsprop_update_item(gtj, j, index)
+
+                        else:
+                            # the update is normal
+                            update_u = gtu
+                            update_j = gtj
+                            update_i = gti
+
+                        # Let's update
+                        self.W[u, index] -= self.learning_rate * update_u
+                        self.H[i, index] -= self.learning_rate * update_i
+                        self.H[j, index] -= self.learning_rate * update_j
+                    
+                    else:
+
+                        # Copy original value to avoid messing up the updates
+                        H_i = self.H[i, index]
+                        W_u = self.W[u, index]
+
+                        # calculate gradients
+                        gtu = (error * ( - H_i ) + self.user_reg * W_u)
+                        gti = (error * ( - W_u ) + self.positive_reg * H_i)
 
                         # update of U params
                         update_u = self.get_adam_update_user(gtu, u, index)
@@ -379,51 +425,127 @@ cdef class MF_BPR_Cython_Epoch:
                         # update of I params
                         update_i = self.get_adam_update_item(gti, i, index)
 
-                        # update of J params
-                        update_j = self.get_adam_update_item(gtj, j, index)
+                        # Let's update
+                        self.W[u, index] -= self.learning_rate * update_u
+                        self.H[i, index] -= self.learning_rate * update_i
 
-                    elif self.rmsprop:
 
-                        # update of U params
-                        update_u = self.get_rmsprop_update_user(gtu, u, index)
 
-                        # update of I params
-                        update_i = self.get_rmsprop_update_item(gti, i, index)
+                if((numCurrentBatch%5000000==0 and not numCurrentBatch==0) or numCurrentBatch==totalNumberOfBatch-1):
+                    print("Processed {} ( {:.2f}% ) in {:.2f} seconds. Sample per second: {:.0f}".format(
+                        numCurrentBatch*self.batch_size,
+                        100.0* float(numCurrentBatch*self.batch_size)/self.numPositiveIteractions,
+                        time.time() - start_time_batch,
+                        float(numCurrentBatch*self.batch_size + 1) / (time.time() - start_time_epoch)))
 
-                        # update of J params
-                        update_j = self.get_rmsprop_update_item(gtj, j, index)
+                    sys.stdout.flush()
+                    sys.stderr.flush()
 
-                    else:
-                        # the update is normal
-                        update_u = gtu
-                        update_j = gtj
-                        update_i = gti
+                    start_time_batch = time.time()
 
-                    # Let's update
-                    self.W[u, index] -= self.learning_rate * update_u
-                    self.H[i, index] -= self.learning_rate * update_i
-                    self.H[j, index] -= self.learning_rate * update_j
+            if self.useRMSE:
+                print("Loss: ", loss)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
+    def epochIteration_Cython_adam(self, l_rate, reset_cache=True):
+
+        # Get number of available interactions
+        cdef long totalNumberOfBatch = int(self.numPositiveIteractions / self.batch_size) + 1
+
+
+        cdef BPR_sample sample
+        cdef long u, i, j, idx
+        cdef long index, numCurrentBatch
+        cdef double x_uij, sigmoid, error, rui
+
+        cdef int numSeenItems
+
+        # Variables for AdaGrad and RMSprop
+        cdef double [:] sgd_cache
+        cdef double cacheUpdate, cacheUpdate_i, cacheUpdate_j, cacheUpdate_u
+        cdef float gamma
+
+        cdef double H_i, H_j, W_u
+        cdef double sigmoid_i, sigmoid_u, sigmoid_j
+        cdef double update_u, update_i, update_j
+        cdef double gtu, gti, gtj
+        cdef double loss
+
+
+        cdef long start_time_epoch = time.time()
+        cdef long start_time_batch = time.time()
+
+        self.learning_rate = l_rate
+
+        if reset_cache:
+            self.training_step = 0
+
+            # Adam requires
+            self.init_Adam()
+
+
+        loss = 0.0
+
+        for numCurrentBatch in range(totalNumberOfBatch):
+
+            
+            # Uniform user sampling with replacement
+            sample = self.sampleBatch_Cython()
+
+            u = sample.user
+            i = sample.pos_item
+            j = sample.neg_item
+
                 
-                else:
+            self.training_step_users[u] += 1
+            self.training_step_items[i] += 1
+            self.training_step_items[j] += 1
 
-                    # Copy original value to avoid messing up the updates
-                    H_i = self.H[i, index]
-                    W_u = self.W[u, index]
 
-                    # calculate gradients
-                    gtu = (error * ( - H_i ) + self.user_reg * W_u)
-                    gti = (error * ( - W_u ) + self.positive_reg * H_i)
+            x_uij = 0.0
 
-                    # update of U params
-                    update_u = self.get_adam_update_user(gtu, u, index)
+            for index in range(self.num_factors):
+                
+                    x_uij += self.W[u,index] * (self.H[i,index] - self.H[j,index])
 
-                    # update of I params
-                    update_i = self.get_adam_update_item(gti, i, index)
+            # Use gradient of log(sigm(-x_uij))
+            sigmoid = 1 / (1 + exp(x_uij))
+            sigmoid_i = sigmoid
+            sigmoid_j = sigmoid
+            sigmoid_u = sigmoid
 
-                    # Let's update
-                    self.W[u, index] -= self.learning_rate * update_u
-                    self.H[i, index] -= self.learning_rate * update_i
+            for index in range(self.num_factors):
 
+                # Copy original value to avoid messing up the updates
+                H_i = self.H[i, index]
+                H_j = self.H[j, index]
+                W_u = self.W[u, index]
+
+                # calculate gradients
+                gtu = (-sigmoid_u * ( H_i - H_j ) + self.user_reg * W_u)
+                gti = (-sigmoid_i * ( W_u ) + self.positive_reg * H_i)
+                gtj = (-sigmoid_j * (-W_u ) + self.negative_reg * H_j)
+
+
+                    
+
+                # update of U params
+                update_u = self.get_adam_update_user(gtu, u, index)
+
+                # update of I params
+                update_i = self.get_adam_update_item(gti, i, index)
+
+                # update of J params
+                update_j = self.get_adam_update_item(gtj, j, index)
+
+
+                # Let's update
+                self.W[u, index] -= self.learning_rate * update_u
+                self.H[i, index] -= self.learning_rate * update_i
+                self.H[j, index] -= self.learning_rate * update_j
 
 
             if((numCurrentBatch%5000000==0 and not numCurrentBatch==0) or numCurrentBatch==totalNumberOfBatch-1):
@@ -437,9 +559,6 @@ cdef class MF_BPR_Cython_Epoch:
                 sys.stderr.flush()
 
                 start_time_batch = time.time()
-
-        if self.useRMSE:
-            print("Loss: ", loss)
 
 
     def get_W(self):

@@ -11,7 +11,7 @@ from sklearn.linear_model import SGDRegressor
 #  no_components=100, n_epochs=2, user_reg=1e-2, item_reg=1e-3, l_rate=1e-2, epoch_multiplier=5 0.045 after 20 epochs
 class MF_BPR():
 
-    def __init__(self, compile_cython=True):
+    def __init__(self, U=None, V=None):
         self.R_hat = None
         self.pl_id_list = None
         self.tr_id_list = None
@@ -23,10 +23,11 @@ class MF_BPR():
         self.urm = None
         self.icm = None
         self.target_users = None
+        self.U = U
+        self.V = V
 
-        if compile_cython:
-            if _requireCompilation():
-                self.runCompilationScript()
+        if _requireCompilation():
+            self.runCompilationScript()
         pass
 
     def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=2, user_reg=1e-1, pos_item_reg=1e-2, neg_item_reg=1e-3, l_rate=1e-2, epoch_multiplier=5):
@@ -73,7 +74,9 @@ class MF_BPR():
                                                    positive_reg=pos_item_reg,
                                                    negative_reg=neg_item_reg,
                                                    epoch_multiplier=epoch_multiplier,
-                                                   opt_mode='bpr')
+                                                   opt_mode='bpr',
+                                                   W=self.U,
+                                                   H=self.V)
 
 
         # start learning
@@ -92,6 +95,7 @@ class MF_BPR():
         self.H = self.cythonEpoch.get_H()
 
         print("R_hat done")
+
 
     def _predict(self, R_hat, at=5):
         recs = {}
@@ -133,6 +137,19 @@ class MF_BPR():
         R_hat = csr_matrix(top_k_filtering(R_hat, 10))
         return self._predict(R_hat)
 
+    def getR_hat(self, urm):
+        W = self.W[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        H = self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+        R_hat = np.dot(W, H.transpose())
+
+        urm_cleaned = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat = csr_matrix(R_hat)
+        R_hat = csr_matrix(top_k_filtering(R_hat, 10))
+        return R_hat
+
     def predict_knn(self, at=5):
         S = csr_matrix(self.m_dot_chunked(self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.H.transpose(), topK=100))
         print("S done")
@@ -141,6 +158,36 @@ class MF_BPR():
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
         R_hat = self.urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S.transpose())
         urm_cleaned = self.urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat.eliminate_zeros()
+        R_hat = csr_matrix(top_k_filtering(R_hat, 10))
+        return self._predict(R_hat)
+
+    def getR_hat_knn(self, urm, at=5):
+        S = csr_matrix(self.m_dot_chunked(self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.H.transpose(), topK=100))
+        print("S done")
+        # Normalize S
+        s_norm = S.sum(axis=1)
+        S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+        R_hat = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S.transpose())
+        urm_cleaned = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat.eliminate_zeros()
+        R_hat = csr_matrix(top_k_filtering(R_hat, 10))
+        return R_hat
+
+    def predict_knn_custom(self, urm, at=5):
+        S = csr_matrix(self.m_dot_chunked(self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.H.transpose(), topK=100))
+        print("S done")
+        # Normalize S
+        s_norm = S.sum(axis=1)
+        S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+        R_hat = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S.transpose())
+        urm_cleaned = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
         urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
 
         R_hat[urm_cleaned.nonzero()] = 0

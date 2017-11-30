@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.BaseRecommender import BaseRecommender
-from fastFM.sgd import FMRegression
+from fastFM.mcmc import FMRegression
 
 
 
@@ -114,13 +114,6 @@ class FM(BaseRecommender):
 
         print("Y done")
 
-        print("Start learning")
-        # start learning
-        fmreg = FMRegression()
-        fmreg.fit(M, y)
-
-        print("Learning finished")
-
         # build x test
         n_tg_user = len(self.pl_id_list)
         n_tg_items = len(self.tr_id_list)
@@ -131,7 +124,7 @@ class FM(BaseRecommender):
 
         tg_pl_index = [dataset.get_playlist_index_from_id(x)
                        for x in self.pl_id_list]
-        tg_tr_index = [dataset.get_playlist_index_from_id(x)
+        tg_tr_index = [dataset.get_track_index_from_id(x)
                        for x in self.tr_id_list]
 
         # index for rows
@@ -155,8 +148,14 @@ class FM(BaseRecommender):
             index += 1
 
         X_test = X_test.tocsc()
+
+        print("Start learning")
+
+        # start learning
+        fmreg = FMRegression(n_iter=M.shape[0] * 50)
+
         # prediction
-        y_test = fmreg.predict(X_test)
+        y_test = fmreg.fit_predict(M, y, X_test)
 
         print("prediction finished")
         # build r_hat from y_test
@@ -166,10 +165,18 @@ class FM(BaseRecommender):
         index = 0
         for user_index in range(n_tg_user):
             user_row = y_test[index * n_tg_items: (index + 1) * n_tg_items]
-            user_row_filtered = top_k_filtering(user_row, topK=5)
-            R_hat[user_index] = user_row_filtered
+            sorted_idx = np.argpartition(user_row, user_row.shape[0] - 5)[:-5]
+            user_row[sorted_idx] = 0
+            R_hat[user_index] = csr_matrix(user_row)
 
             index += 1
+
+        urm_cleaned = urm[tg_pl_index]
+        urm_cleaned = urm_cleaned[:, tg_tr_index]
+
+        R_hat = csr_matrix(R_hat)
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat.eliminate_zeros()
 
         print("R_hat ready")
 
