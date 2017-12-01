@@ -1001,8 +1001,10 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
 
     # normalize tag frequency
     max_freq = max([x for x in tag_counter.values()])
+    min_freq = min([x for x in tag_counter.values()])
     for k in tag_counter:
-        tag_counter[k] = tag_counter[k] / max_freq
+        # normalize between 0.5 and 1
+        tag_counter[k] = 0.5 * (tag_counter[k] - min_freq) / (max_freq - min_freq) + 0.5
 
     return track_id_mapper, track_index_mapper, mapper, attr_index, tag_counter, album_artist_counter, album_artist
 
