@@ -227,7 +227,7 @@ class MF_BPR():
 
         for fileToCompile in fileToCompile_list:
 
-            command = ['python',
+            command = ['python3',
                        'compileCython.py',
                        fileToCompile,
                        'build_ext',
