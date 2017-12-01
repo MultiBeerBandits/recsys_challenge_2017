@@ -147,7 +147,7 @@ class MF_BPR():
 
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat = csr_matrix(R_hat)
-        R_hat = csr_matrix(top_k_filtering(R_hat, 10))
+        R_hat = csr_matrix(top_k_filtering(R_hat, 50))
         return R_hat
 
     def predict_knn(self, at=5):
@@ -177,7 +177,7 @@ class MF_BPR():
 
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
-        R_hat = csr_matrix(top_k_filtering(R_hat, 10))
+        R_hat = csr_matrix(top_k_filtering(R_hat, 50))
         return R_hat
 
     def predict_knn_custom(self, urm, at=5):

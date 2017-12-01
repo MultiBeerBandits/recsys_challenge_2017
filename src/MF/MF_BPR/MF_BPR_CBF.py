@@ -39,7 +39,7 @@ class MF_BPR_CBF(BaseRecommender):
         self.mf.fit(self.r_hat_aug, dataset, list(tg_playlist), list(tg_tracks), n_epochs=2, no_components=500, epoch_multiplier=2, l_rate=1e-2)
 
         # save r-hat
-        self.R_hat = self.mf.getR_hat()
+        self.R_hat = self.mf.getR_hat(urm.tocsr())
 
     def getR_hat(self):
         return self.R_hat

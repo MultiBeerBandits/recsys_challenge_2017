@@ -40,7 +40,7 @@ class MF_BPR_KNN(BaseRecommender):
                     no_components=500, epoch_multiplier=2, l_rate=1e-2)
 
         # save r-hat
-        self.R_hat = self.mf.getR_hat_knn()
+        self.R_hat = self.mf.getR_hat_knn(urm.tocsr())
 
     def getR_hat(self):
         return self.R_hat
