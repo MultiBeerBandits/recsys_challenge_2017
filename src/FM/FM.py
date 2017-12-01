@@ -7,6 +7,7 @@ from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.BaseRecommender import BaseRecommender
 from fastFM.mcmc import FMRegression
+from itertools import product
 
 
 
@@ -112,7 +113,7 @@ class FM(BaseRecommender):
         y = np.ones(M.shape[0])
         y[urm.nnz:y.shape[0]] = 0
 
-        print("Y done")
+        print("Y done: ", len(y[y>0]), len(y[y==0]))
 
         # build x test
         n_tg_user = len(self.pl_id_list)
@@ -129,7 +130,7 @@ class FM(BaseRecommender):
 
         # index for rows
         index = 0
-        for user_index, track_index in zip(tg_pl_index, tg_tr_index):
+        for user_index, track_index in product(tg_pl_index, tg_tr_index):
             X_test[index, user_index] = 1
             X_test[index, n_users + track_index] = 1
 
@@ -148,6 +149,8 @@ class FM(BaseRecommender):
             index += 1
 
         X_test = X_test.tocsc()
+
+        print(X_test.shape[0], n_tg_user*n_tg_items)
 
         print("Start learning")
 
