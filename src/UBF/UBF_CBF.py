@@ -60,8 +60,8 @@ class UBF(BaseRecommender):
         S = compute_cosine(self.r_hat_aug[[dataset.get_playlist_index_from_id(x)
                                             for x in self.pl_id_list]],
                            self.r_hat_aug,
-                           k_filtering=self.k_filtering,
-                           shrinkage=self.shrinkage)
+                           k_filtering=k_filtering,
+                           shrinkage=shrinkage)
         # normalize s
         s_norm = S.sum(axis=1)
         s_norm[s_norm == 0] = 1
