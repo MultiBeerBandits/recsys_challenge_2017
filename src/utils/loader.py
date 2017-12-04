@@ -85,7 +85,7 @@ class Dataset():
         self.track_num_rating_weight = 1
         self.inferred_playcount_weight = 1
         self.inferred_duration_weight = 1
-        self.inferred_album_weight = inferred_album
+        self.inferred_album_weight = 1
 
         # weights of attributes of playlist
         self.created_at_weight = 1
