@@ -54,7 +54,7 @@ class UserItemFiltering():
 
         # get ICM from dataset
         icm = dataset.build_icm_2()
-        icm = dataset.add_tracks_num_rating_to_icm(icm, urm).tocsr()
+        # icm = dataset.add_tracks_num_rating_to_icm(icm, urm).tocsr()
 
         # CONTENT BASED USER PROFILE
         # ucm_red = dataset.build_ucm()

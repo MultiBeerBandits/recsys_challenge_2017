@@ -1,12 +1,12 @@
 from src.utils.loader import *
 from scipy.sparse import *
 from src.utils.evaluator import *
-from src.FWUM.XSquared import *
+from src.FWUM.UICF3 import *
 
 
 def main():
-    ds = Dataset()
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 1)
+    ds = Dataset(load_tags=True, filter_tag=True, weight_tag=False)
+    ds.set_track_attr_weights_2(1, 1, 1, 1, 1, num_rating_weight=1, inferred_album=1, inferred_duration=1, inferred_playcount=1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     xbf = xSquared()
