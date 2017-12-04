@@ -8,7 +8,7 @@ from sklearn.decomposition import TruncatedSVD
 from src.utils.matrix_utils import compute_cosine, top_k_filtering, dot_chunked
 
 
-class xSquared():
+class UserItemFiltering():
     """
     Rationale:
     build a user feature matrix:

@@ -7,7 +7,7 @@ import scipy.sparse.linalg as sLA
 from sklearn.decomposition import TruncatedSVD
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
 
-
+# MAP@5: 0.08292090778858459
 class xSquared():
     """
     Rationale:

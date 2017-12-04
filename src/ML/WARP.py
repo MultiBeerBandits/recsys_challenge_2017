@@ -4,6 +4,7 @@ import numpy as np
 from scipy.sparse import *
 from src.utils.loader import *
 from src.utils.evaluator import *
+from math import sqrt, ceil
 
 
 class WARP():
@@ -14,33 +15,47 @@ class WARP():
         self.tr_id_list = None
         self.model = None
         self.icm_t = None
+        self.ucm_t = None
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=1000, n_epochs=5, item_alpha=1e-4, l_rate=5e-2):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=1000, n_epochs=5, item_alpha=1e-4, l_rate=1e-3):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
-        if self.model is None:
-            self.model = LightFM(loss='bpr', learning_rate=l_rate, random_state=2016, no_components=no_components, item_alpha=item_alpha, max_sampled=100, user_alpha=item_alpha)
-        # Initialize model.
+
+         # Initialize model.
         # Need an identity matrix stacked horizontaly
         # Unknown reason, refer to:
         # https://github.com/lyst/lightfm/blob/master/lightfm/lightfm.py
         if self.icm_t is None:
             id_item = eye(urm.shape[1], urm.shape[1]).tocsr()
-            icm = dataset.build_icm().tocsr()
+            icm = dataset.build_icm_2().tocsr()
             self.icm_t = hstack((id_item, icm.transpose())).tocsr().astype(np.float32)
 
-        # id_playlist = eye(urm.shape[0], urm.shape[0]).tocsr()
-        # ucm = dataset.build_ucm().tocsr()
-        # ucm_t = hstack((id_playlist, ucm.transpose())).tocsr().astype(np.float32)
+        if self.ucm_t is None:
+            id_playlist = eye(urm.shape[0], urm.shape[0]).tocsr()
+            ucm = dataset.build_ucm().tocsr()
+            self.ucm_t = hstack((id_playlist, ucm.transpose())).tocsr().astype(np.float32)
 
-        # iterarray = range(10, 110, 10)
+        no_components = ceil(sqrt(urm.shape[0] + urm.shape[1] + self.icm_t.shape[0] + self.ucm_t.shape[0]))
 
-        # patk_learning_curve(model, urm, test_urm, urm, iterarray, item_features=icm.transpose(), **{'num_threads': 4})
+        print(no_components)
+
+        if self.model is None:
+            self.model = LightFM(loss='warp',
+                                 learning_schedule='adadelta',
+                                 learning_rate=l_rate,
+                                 random_state=2016,
+                                 no_components=no_components,
+                                 item_alpha=item_alpha,
+                                 max_sampled=100,
+                                 user_alpha=item_alpha)
 
         self.model.fit_partial(urm,
-                          epochs=n_epochs,
-                          item_features=self.icm_t, num_threads=4)
+                               epochs=n_epochs,
+                               item_features=self.icm_t,
+                               user_features=self.ucm_t,
+                               num_threads=4,
+                               verbose=True)
         print("Training finished")
 
         tr_indices = np.array(
@@ -53,7 +68,7 @@ class WARP():
             # R_hat[cont] = self.model.predict(
             #     u_index, tr_indices, item_features=icm_t, user_features=ucm_t, num_threads=4)
             R_hat[cont] = self.model.predict(
-                 u_index, tr_indices, num_threads=4, item_features=self.icm_t)
+                 u_index, tr_indices, num_threads=4, item_features=self.icm_t, user_features=self.ucm_t)
             if cont % 1000 == 0:
                 print("Done: ", cont, flush=True)
             cont += 1
@@ -76,7 +91,7 @@ class WARP():
 
 if __name__ == '__main__':
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
+    ds.set_track_attr_weights_2(1, 1, 1, 1, 1, num_rating_weight=1, inferred_album=1, inferred_duration=1, inferred_playcount=1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
