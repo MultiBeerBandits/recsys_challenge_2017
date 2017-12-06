@@ -121,12 +121,23 @@ class FM(BaseRecommender):
 
         n_rows_test = n_tg_user * n_tg_items
 
-        X_test = lil_matrix((n_rows_test, n_cols))
-
         tg_pl_index = [dataset.get_playlist_index_from_id(x)
                        for x in self.pl_id_list]
         tg_tr_index = [dataset.get_track_index_from_id(x)
                        for x in self.tr_id_list]
+
+        # columns are tg_tr_index tiled n _tg_user times
+        cols = np.tile(tg_tr_index, n_tg_user)
+
+        # rows are tg_pl_index repeated n_tg_items times
+        rows = np.repeat(tg_pl_index, n_tg_items)
+
+        X_test = coo_matrix(np.ones(len(rows) * len(cols), (rows, cols)))
+
+        # add icm
+        icm_test = icm[:, tg_tr_index]
+
+        
 
         # index for rows
         index = 0
