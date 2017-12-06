@@ -265,6 +265,26 @@ def _worker_dot_chunked(params):
             result = sps.vstack([result, sub_matrix], format='csr')
     return {'result': result, 'start': start}
 
+def dot_chunked_single(X, Y, topK, chunksize=1000):
+        result = None
+        start = 0
+        mat_len = X.shape[0]
+        for chunk in range(start, mat_len, chunksize):
+            if chunk + chunksize > mat_len:
+                end = mat_len
+            else:
+                end = chunk + chunksize
+            print('Computing dot product for chunk [{:d}, {:d})...'
+                  .format(chunk, end))
+            X_chunk = X[chunk:end]
+            sub_matrix = np.dot(X_chunk, Y)
+            sub_matrix = csr_matrix(top_k_filtering(sub_matrix, topK))
+            if result is None:
+                result = sub_matrix
+            else:
+                result = vstack([result, sub_matrix], format='csr')
+        return result
+
 
 def max_normalize(X):
         """

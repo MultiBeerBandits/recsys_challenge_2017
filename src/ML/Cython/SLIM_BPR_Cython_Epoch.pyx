@@ -21,6 +21,7 @@ cimport numpy as np
 import time
 import sys
 import scipy.sparse as sp
+cimport cython
 
 from libc.math cimport exp, sqrt
 from libc.stdlib cimport rand, RAND_MAX
@@ -122,6 +123,11 @@ cdef class SLIM_BPR_Cython_Epoch:
     cdef int[:] getSeenItems(self, long index):
         return self.M_indices[self.M_indptr[index]:self.M_indptr[index + 1]]
 
+    
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
     def epochIteration_Cython(self):
         cdef long start_time_epoch = time.time()
         cdef long start_time_batch = time.time()

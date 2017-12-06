@@ -1,24 +1,20 @@
 from src.utils.loader import *
+from src.utils.evaluator import *
 from scipy.sparse import *
 import numpy as np
 import numpy.linalg as la
 import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
-from src.utils.matrix_utils import compute_cosine, top_k_filtering
+from src.utils.matrix_utils import compute_cosine, top_k_filtering, max_normalize, normalize_by_row
 from src.utils.BaseRecommender import BaseRecommender
+from src.CBF.CBF_MF import *
 
 
-class ContentBasedFiltering(BaseRecommender):
+class UBF(BaseRecommender):
+    # The prediction is done S_user*(1-alfa) + S_cbf(alfa)
 
-    """
-    Good conf: tag aggr 3,10; tfidf l1 norm over all matrix
-    MAP@5  0.11772497678137457 with 10 shrinkage, 100 k_filtering and other as before
-    MAP@5  0.12039006297936491 urm weight 0.7
-    MAP@5  0.12109109578826009 without playcount and duration
-    """
-
-    def __init__(self, shrinkage=10, k_filtering=100):
+    def __init__(self, r_hat_aug=None):
         # final matrix of predictions
         self.R_hat = None
 
@@ -27,10 +23,9 @@ class ContentBasedFiltering(BaseRecommender):
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-        self.shrinkage = shrinkage
-        self.k_filtering = k_filtering
+        self.r_hat_aug = r_hat_aug
 
-    def fit(self, urm, target_playlist, target_tracks, dataset):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=10, k_filtering=50):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -40,65 +35,49 @@ class ContentBasedFiltering(BaseRecommender):
         R = URM S
         In between eliminate useless row of URM and useless cols of S
         """
+
         # initialization
 
         self.pl_id_list = list(target_playlist)
         self.tr_id_list = list(target_tracks)
         self.dataset = dataset
         S = None
-        urm = urm.tocsr()
         print("CBF started")
-        # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm_2()
 
-        # aggregate tags
-        icm_tag = dataset.build_tag_matrix(icm)
-        print("Aggregating tags features")
-        icm_tag_aggr = aggregate_features(icm_tag, 3, 20)
-        #icm_tag_aggr2 = aggregate_features(icm_tag, 2, 50)
+        urm = urm.tocsr()
 
-        # stack all
-        icm = vstack([icm, icm_tag_aggr], format='csr')
+        if self.r_hat_aug is None:
+            cbf = ContentBasedFiltering()
+            cbf.fit(urm, tg_playlist,
+                    tg_tracks,
+                    ds)
 
-        # add urm
-        # filter urm, keep only playlist with at least 10 songs
+            # get R_hat
+            self.r_hat_aug = cbf.getR_hat()
 
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.8)
-
-        # Tfidf
-        icm = csr_matrix(TfidfTransformer(norm='l1').fit_transform(icm.transpose()).transpose())
-        # idf = icm_ones.sum(axis=1)
-        # idf = np.reciprocal(idf)
-        # idf = np.multiply(idf, icm.shape[1])
-        # idf = np.log(idf)
-
-        # icm = csr_matrix(icm.multiply(idf))
-
-        print("Tfidf done: ", icm.shape)
-        S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
-                                            for x in self.tr_id_list]],
-                           icm,
-                           k_filtering=self.k_filtering,
-                           shrinkage=self.shrinkage)
-        s_norm = S.sum(axis=1)
+        # save S
+        # compute cosine similarity between users
+        S = compute_cosine(self.r_hat_aug[[dataset.get_playlist_index_from_id(x)
+                                            for x in self.pl_id_list]],
+                           self.r_hat_aug,
+                           k_filtering=k_filtering,
+                           shrinkage=shrinkage)
         # normalize s
+        s_norm = S.sum(axis=1)
+        s_norm[s_norm == 0] = 1
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+
         # compute ratings
         print("Similarity matrix ready!")
-        urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
-                           for x in self.pl_id_list]]
-        # s_norm = S.sum(axis=1)
-        # normalize s
-        # S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
-        self.S = S.transpose()
-        # compute ratings
-        R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
-        # eliminate useless columns
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(x)
-                                      # for x in self.tr_id_list]]
+        urm_cleaned = urm[:, [dataset.get_track_index_from_id(x)
+                              for x in self.tr_id_list]]
+
+        R_hat = S.dot(urm_cleaned)
+
+        # clean from already rated items
         print("R_hat done")
-        urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
-                                      for x in self.tr_id_list]]
+        urm_cleaned = urm_cleaned[[dataset.get_playlist_index_from_id(x)
+                                   for x in self.pl_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
         # eliminate playlist that are not target, already done, to check
@@ -132,12 +111,26 @@ class ContentBasedFiltering(BaseRecommender):
             recs[pl_id] = tracks_ids
         return recs
 
-    def getR_hat(self):
-        return self.R_hat
-
-
     def get_model(self):
         """
         Returns the complete R_hat
         """
         return self.R_hat.copy()
+
+    def getR_hat(self):
+        return self.R_hat
+
+
+if __name__ == '__main__':
+    ds = Dataset(load_tags=True, filter_tag=True)
+    ds.set_track_attr_weights_2(1, 1, 0, 0, 1, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
+    ev = Evaluator()
+    ev.cross_validation(5, ds.train_final.copy())
+    cbf = ContentBasedFiltering()
+    for i in range(0, 5):
+        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+        cbf.fit(urm, tg_playlist, tg_tracks, ds)
+        recs = cbf.predict()
+        ev.evaluate_fold(recs)
+    map_at_five = ev.get_mean_map()
+    print("MAP@5 :", map_at_five)

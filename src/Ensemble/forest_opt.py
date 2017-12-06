@@ -1,18 +1,20 @@
 from skopt import forest_minimize
-from skopt.space import Real
+from skopt.space import Integer
 from scipy.sparse import *
 from src.ML.CSLIM_parallel import *
 from src.utils.loader import *
 from src.utils.evaluator import *
 from src.Ensemble.ensemble import Ensemble
 from src.Ensemble.simEnsemble import SimEnsemble
-from src.FWUM.UICF import xSquared
-from src.CBF.CBF import ContentBasedFiltering
-from src.UBF.UBF import UserBasedFiltering
-from src.MF.iALS import IALS
+from src.CBF.CBF_tfidf import ContentBasedFiltering
+from src.UBF.UBF_CBF import UBF
 from src.SLIM_BPR.Cython.SLIM_BPR_Cython import SLIM_BPR_Cython
 from src.Pop.popularity import Popularity
-from src.ML.CSLIM_parallel import SLIM
+from src.MF.MF_BPR.MF_BPR_CBF import MF_BPR_CBF
+from src.MF.MF_BPR.MF_BPR_KNN import MF_BPR_KNN
+from src.CBF.CBF_4 import IBF
+from src.CBF.CBF_MF import ContentBasedFiltering as CBF_AUG
+from src.ML.BPRSLIM_ext import BPRSLIM
 # Logging stuff
 import logging
 
@@ -81,12 +83,13 @@ def result(res):
 
 def linear_ensemble():
     global ensemble, ev
-    space = [Real(0.0, 1.0),  # XBF
-             Real(0.0, 1.0),  # CBF
-             Real(0.0, 1.0),  # UBF
-             # Real(0.0, 1.0),  # IALS
-             Real(0.0, 1.0),  # CSLIM
-             Real(0.0, 1.0),  # Pop
+    space = [Integer(0, 1000),  # MF_BPR_CBF
+             Integer(0, 1000),  # MF_BPR_KNN
+             Integer(0, 1000),  # CBF
+             Integer(0, 1000),  # UBF
+             Integer(0, 1000),  # IBF
+             # Integer(0, 1000),  # BPR_CSLIM
+             Integer(0, 100)  # Pop
              ]
     # x0 = [1, 0, 0, 0, 0, 0]
     # x1 = [0, 1, 0, 0, 0, 0]
@@ -95,35 +98,53 @@ def linear_ensemble():
     # x4 = [0, 0, 0, 0, 1, 0]
     # x5 = [0, 0, 0, 0, 0, 1]
 
-    x0 = [1, 0, 0, 0, 0]
-    x1 = [0, 1, 0, 0, 0]
-    x2 = [0, 0, 1, 0, 0]
-    x3 = [0, 0, 0, 1, 0]
-    x4 = [0, 0, 0, 0, 1]
+    # initial values are the single recommenders
+    x0 = [1, 0, 0, 0, 0, 0]
+    x1 = [0, 1, 0, 0, 0, 0]
+    x2 = [0, 0, 1, 0, 0, 0]
+    x3 = [0, 0, 0, 1, 0, 0]
+    x4 = [0, 0, 0, 0, 1, 0]
+    x5 = [0, 0, 0, 0, 0, 1]
+    #x6 = [0, 0, 0, 0, 0, 0, 1]
 
-    x0s = [x0, x1, x2, x3, x4]
+    x0s = [x0, x1, x2, x3, x4, x5]
     # get the current fold
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 0.9, 0.2, 0.2, 0.2)
-    ds.set_playlist_attr_weights(0.5, 0.5, 0.5, 0.05, 0.05)
+    ds.set_track_attr_weights_2(1, 1, 0, 0, 1, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
 
+    # augment r_hat
+    cbf_aug = CBF_AUG()
+    cbf_aug.fit(urm, tg_playlist,
+                tg_tracks,
+                ds)
+
+    # get R_hat
+    r_hat_aug = cbf_aug.getR_hat()
+
     # create all the models
     cbf = ContentBasedFiltering()
-    xbf = xSquared()
-    # ials = IALS(500, 50, 1e-4, 800)
-    ubf = UserBasedFiltering()
-    # bpr_cslim = create_BPR_SLIM(urm, ds)
-    pop = Popularity()
-    cslim = SLIM()
+    ubf = UBF(r_hat_aug)
+    ibf = IBF(r_hat_aug)
+    pop = Popularity(20)
+    mf_bpr = MF_BPR_CBF(r_hat_aug)
+    mf_bpr_knn = MF_BPR_KNN(r_hat_aug)
+    # bpr = BPRSLIM(epochs=2,
+    #               epochMultiplier=10,
+    #               sgd_mode='rmsprop',
+    #               learning_rate=5e-08,
+    #               topK=300,
+    #               urmSamplingChances=2 / 5,
+    #               icmSamplingChances=3 / 5,
+    #               urm_ext=R_hat)
 
     # add models to list of models
-    models = [cslim, xbf, cbf, ubf, pop]
+    models = [mf_bpr, mf_bpr_knn, cbf, ubf, ibf, pop]
 
     # create the ensemble
-    ensemble = Ensemble(models)
+    ensemble = Ensemble(models, normalize_ratings=True)
 
     # call fit on ensemble to fit all models
     ensemble.fit(urm, list(tg_tracks), list(tg_playlist), ds)
@@ -134,7 +155,7 @@ def linear_ensemble():
                           x0=x0s,
                           verbose=True,
                           n_random_starts=20,
-                          n_calls=300,
+                          n_calls=10000,
                           n_jobs=-1,
                           callback=result)
 
@@ -187,4 +208,4 @@ def cluster_ensemble():
         print('{}: {}'.format(p, x_))
 
 if __name__ == '__main__':
-    opt_sim_ensemble()
+    linear_ensemble()

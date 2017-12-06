@@ -16,18 +16,22 @@ class Dataset():
     A Dataset contains useful structures for accessing tracks and playlists
     """
 
-    def __init__(self, load_tags=False, filter_tag=False):
+    def __init__(self, load_tags=False, filter_tag=False, weight_tag=False):
         # Load_tags is true if need to load tags
         # prefix of data folder
         self.prefix = './data/'
         self.load_tags = load_tags
+        # if weight tag it's true weight each tag by its frequency
+        # and normalize between 0.5 and 1
+        self.weight_tag = weight_tag
         # initialization of user rating matrix
         self.urm = None
         # Initialize clusters for duration and playcount
         # selected by studying the error of k-means
-        self.duration_intervals = 20
-        self.playcount_intervals = 20
-        self.pop_threshold = 5
+        # it was 20
+        self.duration_intervals = 30
+        self.playcount_intervals = 30
+        self.pop_threshold = 10
         # for created_at of playlists
         self.created_at_intervals = 30
         self.playlist_duration_intervals = 30
@@ -43,11 +47,11 @@ class Dataset():
         # track_attr_mapper maps attributes to row index
         # format: {'artist_id': {'artist_key': row_index}}
         # tag counter maps tags to its frequency normalized
-        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter = build_tracks_mappers_clusters(
-           self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
+        #self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter = build_tracks_mappers_clusters(
+        #  self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
         # extended version
-        # self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter, self.album_artist_counter, self.album_artist = build_tracks_mappers_clusters_ext(
-        #     self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
+        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter, self.album_artist_counter, self.album_artist = build_tracks_mappers_clusters_ext(
+             self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
         # build playlist mappers
         # playlist_id_mapper maps playlist id to columns of ucm
         # format: {'item_id': column_index}
@@ -79,6 +83,9 @@ class Dataset():
         self.playcount_weight = 1
         self.tags_weight = 1
         self.track_num_rating_weight = 1
+        self.inferred_playcount_weight = 1
+        self.inferred_duration_weight = 1
+        self.inferred_album_weight = 1
 
         # weights of attributes of playlist
         self.created_at_weight = 1
@@ -218,9 +225,12 @@ class Dataset():
                     for tag in tags:
                         if tag in self.track_attr_mapper['tags']:
                             tag_index = self.track_attr_mapper['tags'][tag]
-                            # tag_weight = self.tag_counter[tag] * \
-                            #    self.tags_weight
-                            icm[tag_index, track_index] = self.tags_weight
+                            if self.weight_tag:
+                                tag_weight = self.tag_counter[tag] * \
+                                    self.tags_weight
+                            else:
+                                tag_weight = self.tags_weight
+                            icm[tag_index, track_index] = tag_weight
 
                 # duration
                 # get the clusters
@@ -335,6 +345,7 @@ class Dataset():
                 ucm[owner_index, pl_index] = self.owner_weight
                 for title_index in title_index_array:
                     ucm[title_index, pl_index] = self.title_weight
+            index += 1
         return csr_matrix(ucm)
 
     def build_tags_matrix(self, path='./data/tracks_final.csv'):
@@ -602,7 +613,7 @@ class Dataset():
                 track['duration'] = duration_index_icm
                 tracks.append(track)
 
-                index+=1
+                index += 1
 
         # write to csv
         keys = tracks[0].keys()
@@ -1001,8 +1012,10 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
 
     # normalize tag frequency
     max_freq = max([x for x in tag_counter.values()])
+    min_freq = min([x for x in tag_counter.values()])
     for k in tag_counter:
-        tag_counter[k] = tag_counter[k] / max_freq
+        # normalize between 0.5 and 1
+        tag_counter[k] = 0.9 * (tag_counter[k] - min_freq) / (max_freq - min_freq) + 0.1
 
     return track_id_mapper, track_index_mapper, mapper, attr_index, tag_counter, album_artist_counter, album_artist
 

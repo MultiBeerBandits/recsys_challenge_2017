@@ -13,10 +13,7 @@ from src.utils.BaseRecommender import BaseRecommender
 class ContentBasedFiltering(BaseRecommender):
 
     """
-    Good conf: tag aggr 3,10; tfidf l1 norm over all matrix
-    MAP@5  0.11772497678137457 with 10 shrinkage, 100 k_filtering and other as before
-    MAP@5  0.12039006297936491 urm weight 0.7
-    MAP@5  0.12109109578826009 without playcount and duration
+    
     """
 
     def __init__(self, shrinkage=10, k_filtering=100):
@@ -56,10 +53,10 @@ class ContentBasedFiltering(BaseRecommender):
         # aggregate tags
         icm_tag = dataset.build_tag_matrix(icm)
         print("Aggregating tags features")
-        # icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
+        icm_tag_aggr = aggregate_features(icm_tag, 3, 10)
 
         # stack all
-        # icm = vstack([icm, icm_tag_aggr], format='csr')
+        icm = vstack([icm, icm_tag_aggr], format='csr')
 
         # add urm
         icm = dataset.add_playlist_to_icm(icm, urm, 0.7)

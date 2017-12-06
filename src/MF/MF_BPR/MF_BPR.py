@@ -11,7 +11,7 @@ from sklearn.linear_model import SGDRegressor
 #  no_components=100, n_epochs=2, user_reg=1e-2, item_reg=1e-3, l_rate=1e-2, epoch_multiplier=5 0.045 after 20 epochs
 class MF_BPR():
 
-    def __init__(self, compile_cython=True):
+    def __init__(self, U=None, V=None):
         self.R_hat = None
         self.pl_id_list = None
         self.tr_id_list = None
@@ -23,12 +23,14 @@ class MF_BPR():
         self.urm = None
         self.icm = None
         self.target_users = None
+        self.U = U
+        self.V = V
 
-        if compile_cython:
+        if _requireCompilation():
             self.runCompilationScript()
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=100, n_epochs=1, user_reg=1e-2, pos_item_reg=1e-2, neg_item_reg=1e-3, l_rate=5e-1, epoch_multiplier=5):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=2, user_reg=1e-1, pos_item_reg=1e-2, neg_item_reg=1e-3, l_rate=1e-2, epoch_multiplier=5):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         self.dataset = dataset
@@ -36,8 +38,8 @@ class MF_BPR():
         if self.urm is None:
             urm = urm.tocsr()
             self.urm = urm
-            self.icm = dataset.build_icm()
-        urm_ext = self.urm #vstack([urm, self.icm], format='csr')
+            self.icm = dataset.build_icm_2()
+        urm_ext = urm # vstack([urm, self.icm], format='csr')
 
         if self.eligibleUsers is None:
             self.eligibleUsers = []
@@ -72,7 +74,9 @@ class MF_BPR():
                                                    positive_reg=pos_item_reg,
                                                    negative_reg=neg_item_reg,
                                                    epoch_multiplier=epoch_multiplier,
-                                                   opt_mode='rmse')
+                                                   opt_mode='bpr',
+                                                   W=self.U,
+                                                   H=self.V)
 
 
         # start learning
@@ -91,6 +95,7 @@ class MF_BPR():
         self.H = self.cythonEpoch.get_H()
 
         print("R_hat done")
+
 
     def _predict(self, R_hat, at=5):
         recs = {}
@@ -132,6 +137,19 @@ class MF_BPR():
         R_hat = csr_matrix(top_k_filtering(R_hat, 10))
         return self._predict(R_hat)
 
+    def getR_hat(self, urm):
+        W = self.W[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        H = self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+        R_hat = np.dot(W, H.transpose())
+
+        urm_cleaned = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat = csr_matrix(R_hat)
+        R_hat = csr_matrix(top_k_filtering(R_hat, 50))
+        return R_hat
+
     def predict_knn(self, at=5):
         S = csr_matrix(self.m_dot_chunked(self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.H.transpose(), topK=100))
         print("S done")
@@ -140,6 +158,36 @@ class MF_BPR():
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
         R_hat = self.urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S.transpose())
         urm_cleaned = self.urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat.eliminate_zeros()
+        R_hat = csr_matrix(top_k_filtering(R_hat, 10))
+        return self._predict(R_hat)
+
+    def getR_hat_knn(self, urm, at=5):
+        S = csr_matrix(self.m_dot_chunked(self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.H.transpose(), topK=100))
+        print("S done")
+        # Normalize S
+        s_norm = S.sum(axis=1)
+        S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+        R_hat = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S.transpose())
+        urm_cleaned = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+
+        R_hat[urm_cleaned.nonzero()] = 0
+        R_hat.eliminate_zeros()
+        R_hat = csr_matrix(top_k_filtering(R_hat, 50))
+        return R_hat
+
+    def predict_knn_custom(self, urm, at=5):
+        S = csr_matrix(self.m_dot_chunked(self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.H.transpose(), topK=100))
+        print("S done")
+        # Normalize S
+        s_norm = S.sum(axis=1)
+        S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+        R_hat = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S.transpose())
+        urm_cleaned = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
         urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
 
         R_hat[urm_cleaned.nonzero()] = 0
@@ -179,7 +227,7 @@ class MF_BPR():
 
         for fileToCompile in fileToCompile_list:
 
-            command = ['python',
+            command = ['python3',
                        'compileCython.py',
                        fileToCompile,
                        'build_ext',
@@ -211,9 +259,21 @@ class MF_BPR():
         #subprocess.call(["cython", "-a", "MF_BPR_Cython_Epoch.pyx"])
 
 
+def _requireCompilation():
+    import os
+    moduleSubFolder = 'src/MF/MF_BPR/'
+    pyx_source = moduleSubFolder + 'MF_BPR_Cython_Epoch.pyx'
+    c_source = moduleSubFolder + 'MF_BPR_Cython_Epoch.c'
+    if os.path.isfile(c_source):
+        if os.path.getmtime(pyx_source) < os.path.getmtime(c_source):
+            return False
+    return True
+
+
 if __name__ == '__main__':
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
+    # ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
+    ds.set_track_attr_weights_2(1, 0.9, 0.2, 0.2, 0.2, num_rating_weight=0.1, inferred_album=0.8, inferred_duration=0.2, inferred_playcount=0.2)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):

@@ -7,12 +7,14 @@ import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering, max_normalize, normalize_by_row
+from src.utils.BaseRecommender import BaseRecommender
+from src.CBF.CBF_MF import ContentBasedFiltering
 
 
-class ContentBasedFiltering():
+class IBF(BaseRecommender):
     # The prediction is done S_user*(1-alfa) + S_cbf(alfa)
 
-    def __init__(self):
+    def __init__(self, r_hat_aug=None):
         # final matrix of predictions
         self.R_hat = None
 
@@ -21,7 +23,9 @@ class ContentBasedFiltering():
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=50):
+        self.r_hat_aug = r_hat_aug
+
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=10, k_filtering=50):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -42,40 +46,18 @@ class ContentBasedFiltering():
 
         urm = urm.tocsr()
 
-        # get ICM from dataset
-        icm = dataset.build_icm()
+        if self.r_hat_aug is None:
+            # augment r_hat
+            cbf = ContentBasedFiltering()
+            cbf.fit(urm, tg_playlist,
+                    tg_tracks,
+                    ds)
 
-        # add n_ratings to icm
-        icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
-
-        # add urm
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.4)
-
-        # compute cosine similarity (only for tg tracks) wrt to all tracks
-        S = compute_cosine(icm.transpose(),
-                           icm, k_filtering=k_filtering, shrinkage=shrinkage)
-
-        # Normalize S
-        s_norm = S.sum(axis=1)
-        S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
-
-        # save S
-        self.S = S.transpose()
-
-        # compute ratings
-        R_hat = urm.dot(S.transpose()).tocsr()
-
-        # keep only top n ratings of the prediction
-        R_hat[urm.nonzero()] = 0
-        R_hat.eliminate_zeros()
-
-        R_hat = top_k_filtering(R_hat, 20)
-
-        # re add initial ratings
-        R_hat[urm.nonzero()] = 1
+            # get R_hat
+            self.r_hat_aug = cbf.getR_hat()
 
         # do collaborative filtering
-        S_cf = compute_cosine(R_hat.transpose()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], R_hat, k_filtering=k_filtering, shrinkage=shrinkage)
+        S_cf = compute_cosine(self.r_hat_aug.transpose()[[dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.r_hat_aug, k_filtering=k_filtering, shrinkage=shrinkage)
 
         # normalize
         S_cf = normalize_by_row(S_cf)
@@ -90,8 +72,6 @@ class ContentBasedFiltering():
 
         print("R_hat done")
         self.R_hat = csr_matrix(self.R_hat)
-
-        print(self.R_hat.shape, len(self.pl_id_list), len(self.tr_id_list))
 
     def getW(self):
         """
@@ -123,6 +103,9 @@ class ContentBasedFiltering():
         Returns the complete R_hat
         """
         return self.R_hat.copy()
+
+    def getR_hat(self):
+        return self.R_hat
 
 
 if __name__ == '__main__':
