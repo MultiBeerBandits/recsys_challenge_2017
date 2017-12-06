@@ -370,14 +370,14 @@ def _prepareICM(icm, dataset):
     tags = ds.build_tags_matrix()
     aggr_tags = aggregate_features(tags, 3, 10)
     extended_icm = sps.vstack((icm, aggr_tags), format='csr')
-    transformer = TfidfTransformer(norm='l1', use_idf=True,
-                                   smooth_idf=True, sublinear_tf=False)
-    # Compute TF-IDF. Returns a (n_items, n_features) matrix
-    tfidf = transformer.fit_transform(extended_icm.transpose())
-    # Keep the top-k features for each item
-    tfidf = top_k_filtering(tfidf, topK=20).tocsr().transpose()
-    tfidf[tfidf.nonzero()] = 1
-    return tfidf
+    # transformer = TfidfTransformer(norm='l1', use_idf=True,
+    #                                smooth_idf=True, sublinear_tf=False)
+    # # Compute TF-IDF. Returns a (n_items, n_features) matrix
+    # tfidf = transformer.fit_transform(extended_icm.transpose())
+    # # Keep the top-k features for each item
+    # tfidf = top_k_filtering(tfidf, topK=20).tocsr().transpose()
+    # tfidf[tfidf.nonzero()] = 1
+    return extended_icm
 
 
 def _testSingleRun():
@@ -395,12 +395,12 @@ def _testSingleRun():
 
     recommender = BPRSLIM(epochs=100,
                           epochMultiplier=1.0,
-                          sgd_mode='rmsprop',
-                          learning_rate=5e-08,
+                          sgd_mode='momentum',
+                          learning_rate=5e-02,
                           topK=300,
                           urmSamplingChances=1 / 5,
                           icmSamplingChances=4 / 5)
-    recommender.set_evaluation_every(10, ev)
+    recommender.set_evaluation_every(1, ev)
     recommender.fit(urm.tocsr(),
                     icm.tocsr(),
                     tg_playlist,
