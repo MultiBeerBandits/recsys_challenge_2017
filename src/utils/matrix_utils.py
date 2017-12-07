@@ -38,7 +38,7 @@ def cluster_per_n_rating(urm, tg_playlist, ds, n_cluster):
 
 
 def cluster_per_ucm(urm, tg_playlist, ds, n_cluster):
-    icm = ds.build_icm()
+    icm = ds.build_icm_2()
     ucm = ds.build_ucm().transpose()
 
     # get uicm: Users x Features
