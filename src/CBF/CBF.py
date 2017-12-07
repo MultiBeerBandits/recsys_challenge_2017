@@ -43,7 +43,9 @@ class ContentBasedFiltering(BaseRecommender):
 
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm_2()
-        icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
+        # icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
+        # urm_n = np.reciprocal(urm.sum(axis=1))
+        # urm = csr_matrix(urm.multiply(urm_n))
         icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
                                             for x in self.tr_id_list]],
@@ -68,7 +70,7 @@ class ContentBasedFiltering(BaseRecommender):
                                       for x in self.tr_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
-        self.R_hat = R_hat
+        self.R_hat = top_k_filtering(R_hat, 100)
 
     def getW(self):
         """

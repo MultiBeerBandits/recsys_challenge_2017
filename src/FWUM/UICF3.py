@@ -4,7 +4,7 @@ import numpy as np
 import numpy.linalg as LA
 from sklearn.decomposition import TruncatedSVD
 from src.utils.BaseRecommender import BaseRecommender
-from src.utils.matrix_utils import dot_chunked_single
+from src.utils.matrix_utils import dot_chunked_single, top_k_filtering
 
 # map@5 around 0.055 with owner feature
 # MAP@5: 0.056282892256653706 with owner features weighted 0.1 and following weights:
@@ -12,6 +12,8 @@ from src.utils.matrix_utils import dot_chunked_single
 #    ds.set_playlist_attr_weights(0.5, 0.5, 0.9, 0.01, 0.01)
 # MAP@5: 0.06349845434667863 with ds.set_track_attr_weights_2(1, 1, 0.2, 0.2, 0.2, num_rating_weight=1, inferred_album=1, inferred_duration=0.2, inferred_playcount=0.2)
 # ds.set_playlist_attr_weights(0.2, 0.5, 0.9, 0.01, 0.01)
+# MAP@5: 0.08118676015984323 with icm weighted 5 more the ucm
+# MAP@5: 0.08560205081806521 with icm weighted 10 (worst with 20 weights)
 class xSquared(BaseRecommender):
     """
     Rationale:
@@ -98,7 +100,7 @@ class xSquared(BaseRecommender):
         ufm = ufm.multiply(0.9) + ofm.multiply(0.1)
 
         # now stack ucm and ufm
-        ucm_ext = vstack([ufm.transpose().multiply(5),
+        ucm_ext = vstack([ufm.transpose().multiply(10),
                           self.ucm[:, [dataset.get_playlist_index_from_id(x)
                                        for x in target_playlist]]],
                          format='csr')
@@ -124,7 +126,7 @@ class xSquared(BaseRecommender):
 
         # now stack icm and user content matrix
         icm_ext = vstack([self.icm[:, [dataset.get_track_index_from_id(x)
-                                       for x in target_tracks]].multiply(5),
+                                       for x in target_tracks]].multiply(10),
                           iucm],
                          format='csr')
 
@@ -141,7 +143,7 @@ class xSquared(BaseRecommender):
         R_hat[urm.nonzero()] = 0
         R_hat.eliminate_zeros()
         print("R_hat done")
-        self.R_hat = R_hat
+        self.R_hat = top_k_filtering(R_hat, 100)
 
     def predict(self, at=5):
         """
