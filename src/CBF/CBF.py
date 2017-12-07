@@ -70,7 +70,7 @@ class ContentBasedFiltering(BaseRecommender):
                                       for x in self.tr_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
-        self.R_hat = top_k_filtering(R_hat, 100)
+        self.R_hat = top_k_filtering(R_hat, 20)
 
     def getW(self):
         """
@@ -89,6 +89,8 @@ class ContentBasedFiltering(BaseRecommender):
             pl_id = self.pl_id_list[i]
             pl_row = self.R_hat.data[self.R_hat.indptr[i]:
                                      self.R_hat.indptr[i + 1]]
+            if i < 5:
+                print(pl_row)
             # get top 5 indeces. argsort, flip and get first at-1 items
             sorted_row_idx = np.flip(pl_row.argsort(), axis=0)[0:at]
             track_cols = [self.R_hat.indices[self.R_hat.indptr[i] + x]
