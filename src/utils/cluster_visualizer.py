@@ -6,7 +6,7 @@ from src.IBF.IBF import *
 from src.CBF.CBF import ContentBasedFiltering
 from src.utils.matrix_utils import cluster_per_n_rating, cluster_per_ucm
 from src.utils.plotter import visualize_2d
-from src.FWUM.UICF import UICF3
+from src.FWUM.UICF3 import xSquared
 from src.Pop.popularity import Popularity
 
 
