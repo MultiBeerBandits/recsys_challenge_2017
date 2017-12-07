@@ -17,7 +17,7 @@ def main():
     ev = Evaluator()
     ev.cross_validation(3, ds.train_final.copy())
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-    n_clusters = 10
+    n_clusters = 20
 
     # create all the models
     cbf = ContentBasedFiltering()
@@ -27,7 +27,7 @@ def main():
     ubf = UserBasedFiltering()
 
     models = [ibf, cbf, xbf, ubf]
-    names = ["IBF", "CBF", "XBF", "UICF", "UBF"]
+    names = ["IBF", "CBF", "XBF", "UBF"]
     # for each cluster the best model
     rating_best_for_cluster = np.zeros(n_clusters)
     ucm_best_for_cluster = np.zeros(n_clusters)
