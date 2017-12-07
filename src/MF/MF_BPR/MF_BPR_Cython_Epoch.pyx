@@ -39,6 +39,9 @@ cdef class MF_BPR_Cython_Epoch:
     cdef int n_items, num_factors
     cdef int numPositiveIteractions
     cdef long urm_nnz
+    # ICM
+    cdef long num_features
+    cdef long num_user_sample
 
     cdef int useRMSE, useBPR
 
@@ -108,15 +111,20 @@ cdef class MF_BPR_Cython_Epoch:
     # if decision < target_prob : sample from target
     # else sample from all
     cdef int total_prob
+    cdef int urm_prob
 
 
     def __init__(self, URM_mask, eligibleUsers, num_factors, target_users=None, target_items=None,
                  learning_rate = 0.05, user_reg = 0.0, positive_reg = 0.0, negative_reg = 0.0,
-                 batch_size = 1, sgd_mode='sgd', epoch_multiplier=1.0, opt_mode='bpr', W=None, H=None):
+                 batch_size = 1, sgd_mode='sgd', epoch_multiplier=1.0, opt_mode='bpr', W=None, H=None, num_features=None, num_user_sample=None):
 
         super(MF_BPR_Cython_Epoch, self).__init__()
 
         self.numPositiveIteractions = int(URM_mask.nnz * epoch_multiplier)
+        if num_user_sample is None:
+            self.num_user_sample = URM_mask.shape[0]
+        else:
+            self.num_user_sample = num_user_sample
         self.n_users = URM_mask.shape[0]
         self.n_items = URM_mask.shape[1]
         self.num_factors = num_factors
@@ -208,7 +216,12 @@ cdef class MF_BPR_Cython_Epoch:
 
         # sample strategy
         self.target_prob = 5
+        self.urm_prob = 7
         self.total_prob = 10
+
+        # icm part
+        if num_features is not None:
+            self.num_features = num_features
 
 
     # Using memoryview instead of the sparse matrix itself allows for much faster access
@@ -494,6 +507,7 @@ cdef class MF_BPR_Cython_Epoch:
             
             # Uniform user sampling with replacement
             sample = self.sampleBatch_Cython()
+            # sample = self.sam()
 
             u = sample.user
             i = sample.pos_item
@@ -812,6 +826,63 @@ cdef class MF_BPR_Cython_Epoch:
             index = rand() % self.num_target_users
 
             sample.user = self.target_users[index]
+
+        self.seenItemsSampledUser = self.getSeenItems(sample.user)
+        self.numSeenItemsSampledUser = len(self.seenItemsSampledUser)
+
+        index = rand() % self.numSeenItemsSampledUser
+
+        sample.pos_item = self.seenItemsSampledUser[index]
+
+
+        negItemSelected = False
+
+        # It's faster to just try again then to build a mapping of the non-seen items
+        # for every user
+        while (not negItemSelected):
+            sample.neg_item = rand() % self.n_items
+
+            index = 0
+            while index < self.numSeenItemsSampledUser and self.seenItemsSampledUser[index]!=sample.neg_item:
+                index+=1
+
+            if index == self.numSeenItemsSampledUser:
+                negItemSelected = True
+
+        return sample
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    @cython.cdivision(True)
+    cdef BPR_sample sample_mixed(self):
+        """
+        Uses a distribution of probability to sample from icm
+        """
+
+        cdef BPR_sample sample = BPR_sample()
+        cdef long index
+        cdef int negItemSelected
+        cdef int decision
+
+        # Warning: rand() returns an integer
+
+        # decide if sample from target or from non target
+        decision = rand() % self.total_prob
+
+        if decision > self.urm_prob:
+
+            # sample from urm
+            index = rand() % self.num_user_sample
+
+            sample.user = self.eligibleUsers[index]
+
+        else:
+
+            # sample from icm
+            index = rand() % self.num_features + self.num_user_sample
+
+            sample.user = self.eligibleUsers[index]
 
         self.seenItemsSampledUser = self.getSeenItems(sample.user)
         self.numSeenItemsSampledUser = len(self.seenItemsSampledUser)
