@@ -1,9 +1,6 @@
 from src.utils.loader import *
 from scipy.sparse import *
 import numpy as np
-import numpy.linalg as la
-import scipy.sparse.linalg as sLA
-from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.BaseRecommender import BaseRecommender
@@ -13,9 +10,17 @@ class ContentBasedFiltering(BaseRecommender):
 
     """
     Good conf: tag aggr 3,10; tfidf l1 norm over all matrix
-    MAP@5  0.11772497678137457 with 10 shrinkage, 100 k_filtering and other as before
+    MAP@5  0.11772497678137457 with 10 shrinkage,
+                                    100 k_filtering and other as before
     MAP@5  0.12039006297936491 urm weight 0.7
     MAP@5  0.12109109578826009 without playcount and duration
+
+    Current best:
+    CBF (album 1.0, artists 1.0, no duration/playcount)
+        + URM 0.8
+        + TOP-55 (TFIDF (tags 1.0))
+        MAP@5 0.11897304011860126
+        Public leaderboard: 0.09616
     """
 
     def __init__(self, shrinkage=10, k_filtering=100):
@@ -51,59 +56,47 @@ class ContentBasedFiltering(BaseRecommender):
         # get ICM from dataset, assume it already cleaned
         icm = dataset.build_icm_2()
 
-        # aggregate tags
-        icm_tag = dataset.build_tag_matrix(icm)
-        print("Aggregating tags features")
-        icm_tag_aggr = aggregate_features(icm_tag, 3, 20)
-        #icm_tag_aggr2 = aggregate_features(icm_tag, 2, 50)
+        # Build the tag matrix, apply TFIDF
+        print("Build tags matrix and apply TFIDF...")
+        icm_tag = dataset.build_tags_matrix()
+        tags = applyTFIDF(icm_tag)
+
+        # Before stacking tags with the rest of the ICM, we keep only
+        # the top K tags for each item. This way we try to reduce the
+        # natural noise added by such sparse features.
+        tags = top_k_filtering(tags.transpose(), topK=55).transpose()
 
         # stack all
-        icm = vstack([icm, icm_tag_aggr], format='csr')
+        icm = vstack([icm, tags, urm * 0.8], format='csr')
 
-        # add urm
-        # filter urm, keep only playlist with at least 10 songs
-
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.8)
-
-        # Tfidf
-        icm = csr_matrix(TfidfTransformer(norm='l1').fit_transform(icm.transpose()).transpose())
-        # idf = icm_ones.sum(axis=1)
-        # idf = np.reciprocal(idf)
-        # idf = np.multiply(idf, icm.shape[1])
-        # idf = np.log(idf)
-
-        # icm = csr_matrix(icm.multiply(idf))
-
-        print("Tfidf done: ", icm.shape)
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
                                             for x in self.tr_id_list]],
                            icm,
                            k_filtering=self.k_filtering,
-                           shrinkage=self.shrinkage)
+                           shrinkage=self.shrinkage,
+                           n_threads=4,
+                           chunksize=300)
         s_norm = S.sum(axis=1)
-        # normalize s
+
+        # Normalize S
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
-        # compute ratings
         print("Similarity matrix ready!")
+
+        # Keep only the target playlists in the URM
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x)
                            for x in self.pl_id_list]]
-        # s_norm = S.sum(axis=1)
-        # normalize s
-        # S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
         self.S = S.transpose()
-        # compute ratings
+
+        # Compute ratings
         R_hat = urm_cleaned.dot(S.transpose().tocsc()).tocsr()
-        # eliminate useless columns
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(x)
-                                      # for x in self.tr_id_list]]
         print("R_hat done")
+
+        # Remove the entries in R_hat that are already present in the URM
         urm_cleaned = urm_cleaned[:, [dataset.get_track_index_from_id(x)
                                       for x in self.tr_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
-        # eliminate playlist that are not target, already done, to check
-        # R_hat = R_hat[:, [dataset.get_track_index_from_id(
-        #    x) for x in self.tr_id_list]]
+
         print("Shape of final matrix: ", R_hat.shape)
         self.R_hat = R_hat
 
@@ -135,9 +128,81 @@ class ContentBasedFiltering(BaseRecommender):
     def getR_hat(self):
         return self.R_hat
 
-
     def get_model(self):
         """
         Returns the complete R_hat
         """
         return self.R_hat.copy()
+
+
+def applyTFIDF(matrix):
+    from sklearn.feature_extraction.text import TfidfTransformer
+    transformer = TfidfTransformer(norm='l1', use_idf=True,
+                                   smooth_idf=True, sublinear_tf=False)
+    tfidf = transformer.fit_transform(matrix.transpose())
+    return tfidf.transpose()
+
+
+def produceCsv():
+    # export csv
+    dataset = Dataset(load_tags=True,
+                      filter_tag=False,
+                      weight_tag=False)
+    dataset.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
+                                     1.0, 1.0, 0.0, 0.0)
+    cbf_exporter = ContentBasedFiltering()
+    urm = dataset.build_train_matrix()
+    tg_playlist = list(dataset.target_playlists.keys())
+    tg_tracks = list(dataset.target_tracks.keys())
+    # Train the model with the best shrinkage found in cross-validation
+    cbf_exporter.fit(urm,
+                     tg_playlist,
+                     tg_tracks,
+                     dataset)
+    recs = cbf_exporter.predict()
+    with open('submission_cbf.csv', mode='w', newline='') as out:
+        fieldnames = ['playlist_id', 'track_ids']
+        writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
+        writer.writeheader()
+        for k in tg_playlist:
+            track_ids = ''
+            for r in recs[k]:
+                track_ids = track_ids + r + ' '
+            writer.writerow({'playlist_id': k,
+                             'track_ids': track_ids[:-1]})
+
+
+def evaluateMap():
+    from src.utils.evaluator import Evaluator
+    dataset = Dataset(load_tags=True,
+                      filter_tag=False,
+                      weight_tag=False)
+    dataset.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
+                                     1.0, 1.0, 0.0, 0.0)
+    ev = Evaluator()
+    ev.cross_validation(5, dataset.train_final.copy())
+    cbf = ContentBasedFiltering()
+    for i in range(0, 5):
+        urm, tg_tracks, tg_playlist = ev.get_fold(dataset)
+        cbf.fit(urm,
+                list(tg_playlist),
+                list(tg_tracks),
+                dataset)
+        recs = cbf.predict()
+        ev.evaluate_fold(recs)
+
+    map_at_five = ev.get_mean_map()
+    print("MAP@5 ", map_at_five)
+
+
+if __name__ == '__main__':
+    import sys
+    choice = sys.argv[1]
+
+    if choice == '--map':
+        evaluateMap()
+    elif choice == '--produceCsv':
+        produceCsv()
+    else:
+        print(("Unknown paramter.\n",
+               "Usage: {} [--map | --produceCsv]".format(sys.argv[0])))
