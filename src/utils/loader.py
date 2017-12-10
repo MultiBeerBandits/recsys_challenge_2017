@@ -1115,21 +1115,23 @@ def most_popular_features(icm, topK):
     Returns a topK-long array of indices
     """
     # Sum the columns to get the number of items each feature appears in
-    popularity = csc_matrix(icm.sum(axis=1))
+    popularity = np.array(icm.sum(axis=1)).squeeze()
     # Get the indices of the topK ones
-    data = popularity.data[popularity.indptr[0]:popularity.indptr[1]]
-    popular_indices = np.argpartition(data,
-                                      len(data) - topK)[-topK:]
+    popular_indices = np.argpartition(popularity,
+                                      popularity.shape[0] - topK)[-topK:]
     return popular_indices
 
 
-def aggregate_features(icm, n_features, topK):
+def aggregate_features(icm, n_features, topK, weighing=False):
     """
     Performs feature aggregation as described in [1]
 
     ICM: sparse matrix - The features matrix with unitary entries.
     N_FEATURES: int - The number of features aggregated in each set.
     TOP_K: int - The number of top features to be aggregated.
+    WEIGHING: bool - If True, the aggregated feature vector is multiplied
+                     by the mean of the weights of the original N_FEATURES
+                     vectors that were aggregated.
 
     Returns a roughly (top_k ** n_features, icm.shape[1]) sparse matrix
 
@@ -1138,11 +1140,13 @@ def aggregate_features(icm, n_features, topK):
     """
     from itertools import product
     final = None
-    icm_ones = icm.copy().tocsr()
-    icm_ones[icm_ones.nonzero()] = 1
-    topKICM = icm_ones[most_popular_features(icm_ones, topK)]
+    print("icm nnz: {}, shape: {}".format(icm.nnz, icm.shape))
+
+    topKICM = icm[most_popular_features(icm, topK)]
+    top_ones = topKICM.copy().tocsr()
+    top_ones[top_ones.nonzero()] = 1
     # Build the list of tuples of feature indices to aggregate
-    features_indices = product(range(topKICM.shape[0]), repeat=n_features)
+    features_indices = product(range(top_ones.shape[0]), repeat=n_features)
     print('Aggregating features...')
     for i, t in enumerate(features_indices):
         if i % 1000 == 0:
@@ -1152,10 +1156,15 @@ def aggregate_features(icm, n_features, topK):
             continue
         # If all distinct, perform an element-wise logical AND
         # of the feature vectors
-        aggr = np.ones((1, topKICM.shape[1]))
+        aggr = np.ones((1, top_ones.shape[1]))
         for index in t:
-            aggr = topKICM.getrow(index).multiply(aggr)
+            aggr = top_ones.getrow(index).multiply(aggr)
         aggr = csr_matrix(aggr)
+
+        if weighing:
+            t_ICM = topKICM[list(t)]
+            mean = t_ICM.mean(axis=0)
+            aggr = aggr.multiply(mean)
 
         # Stack current aggregation over final matrix
         if final is None:
@@ -1181,3 +1190,14 @@ def build_aggregated_feature_space(icm, n_features, topK):
                                    smooth_idf=True, sublinear_tf=False)
     tfidf = transformer.fit_transform(extended_icm)
     return tfidf
+
+
+def user_augmented_icm(urm, ucm):
+    ua_icm = ucm.dot(urm)
+
+    # Compute no of playlists per item
+    norm = urm.sum(axis=0)
+    norm[norm == 0] = 1
+
+    ua_icm = csr_matrix(ua_icm.multiply(np.reciprocal(norm)))
+    return ua_icm
