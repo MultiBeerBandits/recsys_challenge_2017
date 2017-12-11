@@ -59,6 +59,7 @@ class ContentBasedFiltering():
         iucm = ucm.dot(urm)
 
         # icm = vstack([icm.multiply(0), iucm], format='csr')
+        iucm = applyTfIdf(iucm)
 
         S_user = compute_cosine(iucm.transpose()[[dataset.get_track_index_from_id(x)
                                                    for x in self.tr_id_list]],
