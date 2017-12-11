@@ -5,13 +5,13 @@ import numpy.linalg as la
 import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
-from src.utils.matrix_utils import compute_cosine, top_k_filtering
+from src.utils.matrix_utils import compute_cosine, top_k_filtering, applyTfIdf
 
 
 class ContentBasedFiltering():
     # The prediction is done S_user*(1-alfa) + S_cbf(alfa)
 
-    def __init__(self, alfa):
+    def __init__(self):
         # final matrix of predictions
         self.R_hat = None
 
@@ -20,11 +20,8 @@ class ContentBasedFiltering():
         # for keeping reference between tracks and column index
         self.tr_id_list = []
 
-        # save alfa value
-        self.alfa = alfa
 
-
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200, alfa=0.9):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -44,13 +41,16 @@ class ContentBasedFiltering():
         print("CBF started")
 
         # get ICM from dataset
-        icm = dataset.build_icm()
+        icm = dataset.build_icm_2()
 
         # add urm
-        icm = dataset.add_playlist_to_icm(icm, urm, 0.4)
+        icm = dataset.add_playlist_to_icm(icm, urm, 0.8)
+        icm_tag = dataset.build_tags_matrix()
+        tags = applyTfIdf(icm_tag, 55)
+        icm = vstack([icm, tags], format='csr')
 
         # add n_ratings to icm
-        icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
+        # icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
 
         # build user content matrix
         ucm = dataset.build_ucm()
@@ -63,9 +63,11 @@ class ContentBasedFiltering():
         iucm_norm = np.reciprocal(iucm_norm)
         iucm = csr_matrix(iucm.multiply(iucm_norm))
 
+        # icm = vstack([icm.multiply(0), iucm], format='csr')
+
         S_user = compute_cosine(iucm.transpose()[[dataset.get_track_index_from_id(x)
-                                                  for x in self.tr_id_list]],
-                                iucm, k_filtering=k_filtering, shrinkage=shrinkage)
+                                                   for x in self.tr_id_list]],
+                                 iucm, k_filtering=k_filtering, shrinkage=shrinkage)
 
         # To filter or not to filter? Who knows?
 
@@ -86,10 +88,10 @@ class ContentBasedFiltering():
         # compute cosine similarity (only for tg tracks) wrt to all tracks
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
                                             for x in self.tr_id_list]],
-                           icm, k_filtering=k_filtering, shrinkage=shrinkage)
+                           icm, k_filtering=k_filtering, chunksize=1000)
 
         # compute a weighted average
-        S = S.multiply(self.alfa) + S_user.multiply(1 - self.alfa)
+        S = S.multiply(alfa) + S_user.multiply(1 - alfa)
 
         # Normalize S
         s_norm = S.sum(axis=1)
@@ -144,3 +146,32 @@ class ContentBasedFiltering():
         Returns the complete R_hat
         """
         return self.R_hat.copy()
+
+
+def evaluateMap():
+    from src.utils.evaluator import Evaluator
+    dataset = Dataset(load_tags=True,
+                      filter_tag=False,
+                      weight_tag=False)
+    dataset.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
+                                     1.0, 1.0, 0.0, 0.0)
+    ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
+
+    ev = Evaluator()
+    ev.cross_validation(5, dataset.train_final.copy())
+    cbf = ContentBasedFiltering()
+    for i in range(0, 5):
+        urm, tg_tracks, tg_playlist = ev.get_fold(dataset)
+        cbf.fit(urm,
+                list(tg_playlist),
+                list(tg_tracks),
+                dataset)
+        recs = cbf.predict()
+        ev.evaluate_fold(recs)
+
+    map_at_five = ev.get_mean_map()
+    print("MAP@5 ", map_at_five)
+
+
+if __name__ == '__main__':
+    evaluateMap()
