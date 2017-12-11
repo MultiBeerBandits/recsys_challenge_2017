@@ -14,7 +14,7 @@ def main():
         for k_f in range(20, 100, 5):
             ds = Dataset()
             ds.set_track_attr_weights(1, 0.9, 0.1, 0.1, 0.1, 0.05)
-            ds.set_playlist_attr_weights(0.5, 0.6, 0.6, 0.1, 0.1)
+            ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
             ev = Evaluator()
             ev.cross_validation(5, ds.train_final.copy())
             ubf = UserBasedFiltering()
