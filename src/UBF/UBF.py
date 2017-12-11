@@ -139,7 +139,7 @@ class UserBasedFiltering(BaseRecommender):
 
 if __name__ == '__main__':
     ds = Dataset(load_tags=True, filter_tag=False, weight_tag=False)
-    ds.set_track_attr_weights_2(1, 1, 0, 0, 1, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
+    ds.set_track_attr_weights_2(1, 1, 0, 0, 0, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     ubf = UserBasedFiltering()
