@@ -155,7 +155,7 @@ def evaluateMap():
                       weight_tag=False)
     dataset.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
                                      1.0, 1.0, 0.0, 0.0)
-    ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
+    dataset.set_playlist_attr_weights(1, 1, 1, 1, 1)
 
     ev = Evaluator()
     ev.cross_validation(5, dataset.train_final.copy())
