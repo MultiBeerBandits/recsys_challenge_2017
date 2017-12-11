@@ -1242,6 +1242,7 @@ def aggregate_features(icm, n_features, topK, weighing=False):
             final = aggr
         else:
             final = vstack((final, aggr), format='csr')
+    print("Non zeros", final.nnz)
     return final
 
 

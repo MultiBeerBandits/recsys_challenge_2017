@@ -9,8 +9,9 @@ from src.utils.matrix_utils import cluster_per_n_rating
 
 
 def main():
-    ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights_2(1, 0.9, 0.2, 0.2, 0.2, num_rating_weight=0.1, inferred_album=0.8, inferred_duration=0.2, inferred_playcount=0.2)
+    ds = Dataset(load_tags=True, filter_tag=False, weight_tag=False)
+    ds.set_track_attr_weights_2(1, 1, 0, 0, 0, num_rating_weight=1, inferred_album=0.5, inferred_duration=0, inferred_playcount=0)
+    ds.set_playlist_attr_weights(1, 1, 1, 0, 0)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
@@ -21,6 +22,7 @@ def main():
                 ds)
         recs = cbf.predict()
         ev.evaluate_fold(recs)
+        # now get_worst returns the worst playlists in the current fold according to map@5
 
     map_at_five = ev.get_mean_map()
     print("MAP@5 ", map_at_five)
