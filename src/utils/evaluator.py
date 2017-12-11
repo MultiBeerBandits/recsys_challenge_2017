@@ -6,7 +6,7 @@ import numpy as np
 
 class Evaluator(object):
 
-    def __init__(self):
+    def __init__(self, seed=False):
         # for each fold the dictionary of predictions
         self.test_dictionaries = []
 
@@ -26,6 +26,10 @@ class Evaluator(object):
         self.map_playlists = {}
 
         self.folds = 0
+
+        # Set the initial seed if specified
+        if seed:
+            random.seed(seed)
 
     def cross_validation(self, folds, train_dataset):
         """
