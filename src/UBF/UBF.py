@@ -1,4 +1,5 @@
 from src.utils.loader import *
+from src.utils.evaluator import *
 from scipy.sparse import *
 import numpy as np
 import numpy.linalg as la
