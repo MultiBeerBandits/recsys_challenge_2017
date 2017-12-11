@@ -58,16 +58,11 @@ class ContentBasedFiltering():
         # build item user-feature matrix: UFxI
         iucm = ucm.dot(urm)
 
-        iucm_norm = urm.sum(axis=0)
-        iucm_norm[iucm_norm == 0] = 1
-        iucm_norm = np.reciprocal(iucm_norm)
-        iucm = csr_matrix(iucm.multiply(iucm_norm))
-
         # icm = vstack([icm.multiply(0), iucm], format='csr')
 
         S_user = compute_cosine(iucm.transpose()[[dataset.get_track_index_from_id(x)
                                                    for x in self.tr_id_list]],
-                                 iucm, k_filtering=k_filtering, shrinkage=shrinkage)
+                                 iucm, k_filtering=k_filtering, normalize=False)
 
         # To filter or not to filter? Who knows?
 

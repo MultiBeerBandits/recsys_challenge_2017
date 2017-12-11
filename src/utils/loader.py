@@ -1017,6 +1017,7 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
                     duration = np.mean(artist_duration[artist_id])
                 else:
                     duration = np.median(durations_ini)
+                    pass
 
             # add to the array
             durations.append(duration)
@@ -1030,6 +1031,7 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
                     playcount = np.mean(artist_playcount[artist_id])
                 else:
                     playcount = np.median(playcounts_ini)
+                    pass
 
             # add to the array
             playcounts.append(playcount)

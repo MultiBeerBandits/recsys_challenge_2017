@@ -24,7 +24,7 @@ class ContentBasedFiltering(BaseRecommender):
         self.shrinkage = shrinkage
         self.k_filtering = k_filtering
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, urm_weight=1):
+    def fit(self, urm, target_playlist, target_tracks, dataset, urm_weight=0.8):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -54,9 +54,7 @@ class ContentBasedFiltering(BaseRecommender):
 
         tags = dataset.build_tags_matrix()
         tags = applyTfIdf(tags, topK=55)
-        tags.data = np.ones_like(tags.data)
         icm = vstack([icm, tags], format='csr')
-        icm = applyTfIdf(icm)
         # build user content matrix
         # ucm = dataset.build_ucm()
 

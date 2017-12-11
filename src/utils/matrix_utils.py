@@ -83,7 +83,7 @@ def cluster_per_uicm(urm, tg_playlist, ds, n_cluster):
     return ucm_cluster
 
 
-def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=100):
+def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=100, normalize=True):
     """
     Returns X_shape[0]xY_shape[1]
     """
@@ -91,12 +91,13 @@ def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=10
         from scipy.sparse.linalg import norm
         import multiprocessing as mp
 
-        x_norm = norm(X, axis=1)
-        x_norm[x_norm == 0] = 1
-        X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)).transpose())
-        y_norm = norm(Y, axis=0)
-        y_norm[y_norm == 0] = 1
-        Y = Y.multiply(np.reciprocal(y_norm))
+        if normalize:
+            x_norm = norm(X, axis=1)
+            x_norm[x_norm == 0] = 1
+            X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)).transpose())
+            y_norm = norm(Y, axis=0)
+            y_norm[y_norm == 0] = 1
+            Y = Y.multiply(np.reciprocal(y_norm))
         Y_ones = Y.copy()
         Y_ones.data = np.ones_like(Y_ones.data)
 
