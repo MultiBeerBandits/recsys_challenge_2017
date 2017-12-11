@@ -262,6 +262,76 @@ class Dataset():
                 playcount_index += 1
         return csr_matrix(icm)
 
+    def build_icm_simple(self, path='./data/tracks_final_processed.csv'):
+        """
+        Each attributes has its index in the icm
+        in this way this method does not have to think
+        returns the item content matrix using mappers defined in dataset class
+        icm matrix encoded as follows:
+        AxI (A is the number of attributes and I is the number of items)
+        """
+        icm = lil_matrix((self.attrs_number, self.tracks_number))
+        duration_index = 0
+        playcount_index = 0
+        with open(path, newline='') as csv_file:
+            reader = csv.DictReader(csv_file, delimiter='\t')
+            for row, index in zip(reader, range(self.tracks_number)):
+
+                # get index of this track
+                self.track_id_mapper[row['track_id']] = index
+                # set attributes in icm
+                artist_index = row['artist_id']
+                icm[artist_index, track_index] = self.artist_weight
+
+                # albums
+                albums = parse_csv_array(row['album'])
+                for album_index in albums:
+                    icm[album_index, track_index] = self.album_weight
+
+                # load tags only if specified
+                if self.load_tags:
+
+                    tags = parse_csv_array(row['tags'])
+                    for tag_index in tags:
+                        if tag in self.track_attr_mapper['tags']:
+                            tag_index = self.track_attr_mapper['tags'][tag]
+                            if self.weight_tag:
+                                tag_weight = self.tag_counter[tag] * \
+                                    self.tags_weight
+                            else:
+                                tag_weight = self.tags_weight
+                            icm[tag_index, track_index] = tag_weight
+
+                # duration
+                # get the clusters
+                duration_offset = self.duration_cluster[duration_index]
+                duration_index_icm = self.track_attr_mapper['duration'] + \
+                    duration_offset
+
+                # select what weight to use
+                duration = row['duration']
+                if duration is not None and duration != '' and float(duration) != -1:
+                    icm[duration_index_icm, track_index] = self.duration_weight
+                else:
+                    icm[duration_index_icm, track_index] = self.inferred_duration_weight
+                # go ahead with duration index
+                duration_index += 1
+                # playcount
+                # playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
+                # get the cluster
+                playcount_offset = self.playcount_cluster[playcount_index]
+                playcount_index_icm = self.track_attr_mapper['playcount'] + \
+                    playcount_offset
+
+                # playcount
+                playcount = row['playcount']
+                if playcount is not None and playcount != '' and float(playcount) != -1:
+                    icm[playcount_index_icm, track_index] = self.playcount_weight
+                else:
+                    icm[playcount_index_icm, track_index] = self.inferred_playcount_weight
+                playcount_index += 1
+        return csr_matrix(icm)
+
     def build_iucm(self, test_dict, path='./data/playlists_final'):
         """
         test_dict is a dict like {pl_id : [tracks]}
@@ -1016,6 +1086,7 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
     for k in tag_counter:
         # normalize between 0.5 and 1
         tag_counter[k] = 0.9 * (tag_counter[k] - min_freq) / (max_freq - min_freq) + 0.1
+        # tag_counter[k] = 1 / tag_counter[k]
 
     return track_id_mapper, track_index_mapper, mapper, attr_index, tag_counter, album_artist_counter, album_artist
 

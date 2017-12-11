@@ -5,7 +5,7 @@ import numpy.linalg as la
 import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
-from src.utils.matrix_utils import compute_cosine, top_k_filtering
+from src.utils.matrix_utils import compute_cosine, top_k_filtering, applyTfIdf
 from src.utils.BaseRecommender import BaseRecommender
 
 
@@ -51,20 +51,22 @@ class UserBasedFiltering(BaseRecommender):
         # add user ratings to ucm
         ucm = vstack([ucm, urm.transpose()])
 
+        ucm = applyTfIdf(ucm)
+
         # build user profile from urm and icm
-        icm = dataset.build_icm()
-        ufm = urm.dot(icm.transpose())
+        # icm = dataset.build_icm()
+        # ufm = urm.dot(icm.transpose())
 
-        # Iu contains for each user the number of tracks rated
-        Iu = urm.sum(axis=1)
-        # save from divide by zero!
-        Iu[Iu == 0] = 1
-        # since we have to divide the ufm get the reciprocal of this vector
-        Iu = np.reciprocal(Iu)
-        # multiply the ufm by Iu. Normalize UFM
-        ufm = ufm.multiply(Iu).transpose()
+        # # Iu contains for each user the number of tracks rated
+        # Iu = urm.sum(axis=1)
+        # # save from divide by zero!
+        # Iu[Iu == 0] = 1
+        # # since we have to divide the ufm get the reciprocal of this vector
+        # Iu = np.reciprocal(Iu)
+        # # multiply the ufm by Iu. Normalize UFM
+        # ufm = ufm.multiply(Iu).transpose()
 
-        ucm = vstack([ucm, ufm], format='csr')
+        # ucm = vstack([ucm, ufm.multiply(5)], format='csr')
 
         # compute cosine similarity between users
         S = compute_cosine(ucm.transpose()[[dataset.get_playlist_index_from_id(x)

@@ -1,6 +1,7 @@
 import scipy.sparse as sps
 import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.loader import *
 
 
@@ -324,6 +325,17 @@ def writeSubmission(fileName, recs, tg_playlist):
 def write_icm_to_file():
     dataset = Dataset(load_tags=True, filter_tag=True)
     dataset.writeICM('new_icm.csv')
+
+def applyTfIdf(matrix, topK=False):
+    """
+    Matrix: Features x Sample
+    """
+    transf = TfidfTransformer(norm='l1')
+    tfidf = transf.fit_transform(matrix.transpose())
+    if topK:
+        print("Doing topk")
+        tfidf = top_k_filtering(tfidf, topK)
+    return tfidf.transpose()
 
 
 if __name__ == '__main__':
