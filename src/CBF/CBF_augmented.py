@@ -62,7 +62,7 @@ class ContentBasedFiltering():
 
         S_user = compute_cosine(iucm.transpose()[[dataset.get_track_index_from_id(x)
                                                    for x in self.tr_id_list]],
-                                 iucm, k_filtering=k_filtering, normalize=False)
+                                 iucm, k_filtering=k_filtering, normalize=True)
 
         # To filter or not to filter? Who knows?
 
