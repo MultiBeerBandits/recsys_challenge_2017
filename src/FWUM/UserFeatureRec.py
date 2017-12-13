@@ -50,7 +50,7 @@ class UserItemFiltering():
         print("FWUM started!")
 
         # get ICM from dataset
-        icm = dataset.build_icm_2()
+        icm = dataset.build_icm()
         tags = dataset.build_tags_matrix()
         tags = applyTfIdf(tags)
         icm = vstack([icm, tags], format='csr')

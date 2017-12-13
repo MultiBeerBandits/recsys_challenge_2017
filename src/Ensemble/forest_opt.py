@@ -7,12 +7,12 @@ from src.utils.evaluator import *
 from src.Ensemble.ensemble import Ensemble
 from src.Ensemble.simEnsemble import SimEnsemble
 from src.CBF.CBF_tfidf import ContentBasedFiltering
-from src.UBF.UBF2 import UBF
+from src.UBF.UBF2 import UserBasedFiltering
 from src.SLIM_BPR.Cython.SLIM_BPR_Cython import SLIM_BPR_Cython
 from src.Pop.popularity import Popularity
 from src.MF.MF_BPR.MF_BPR_CBF import MF_BPR_CBF
 from src.MF.MF_BPR.MF_BPR_KNN import MF_BPR_KNN
-from src.IBF.IBF import IBF
+from src.IBF.IBF import ItemBasedFiltering
 from src.CBF.CBF_MF import ContentBasedFiltering as CBF_AUG
 from src.ML.BPRSLIM_ext import BPRSLIM
 # Logging stuff
@@ -139,8 +139,8 @@ def linear_ensemble():
 
     # create all the models
     cbf = ContentBasedFiltering()
-    ubf = UBF()
-    ibf = IBF()
+    ubf = UserBasedFiltering()
+    ibf = ItemBasedFiltering()
     pop = Popularity(20)
     mf_bpr = MF_BPR_CBF(r_hat_aug)
     mf_bpr_knn = MF_BPR_KNN(r_hat_aug)
