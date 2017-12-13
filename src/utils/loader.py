@@ -1065,12 +1065,7 @@ def build_tracks_mappers_clusters_ext(path, dataset, load_tags=False, filter_tag
             else:
                 mapper['tags'][v] = attr_index
                 attr_index += 1
-    # for k in album_art.keys():
-    #     for album in album_art[k]:
-    #         if k not in mapper['artist_album'].keys():
-    #             mapper['artist_album'][k] = {}
-    #         mapper['artist_album'][k][album] = attr_index
-    #         attr_index += 1
+
     #  Divide duration and playcount in cluster
     dataset.duration_cluster = KMeans(
         n_clusters=dataset.duration_intervals).fit_predict(np.reshape(durations, (-1, 1)))

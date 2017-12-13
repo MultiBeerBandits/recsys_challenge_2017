@@ -9,6 +9,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.matrix_utils import compute_cosine, top_k_filtering, dot_chunked, normalize_by_row
 
 
+# 0.08540903264721408 using owners 0.1
 class UserItemFiltering():
     """
     Rationale:
