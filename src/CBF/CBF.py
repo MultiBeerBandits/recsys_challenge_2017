@@ -54,7 +54,7 @@ class ContentBasedFiltering(BaseRecommender):
 
         tags = dataset.build_tags_matrix()
         tags = applyTfIdf(tags, topK=55)
-        tags.data = np.ones_line(tags.data)
+        tags.data = np.ones_like(tags.data)
         icm = vstack([icm, tags], format='csr')
         icm = applyTfIdf(icm, norm=None)
         # build user content matrix
