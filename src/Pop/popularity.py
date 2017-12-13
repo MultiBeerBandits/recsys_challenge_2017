@@ -8,7 +8,6 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering, max_normalize, cluster_per_n_rating
 from src.utils.BaseRecommender import BaseRecommender
-from src.utils.plotter import visualize_2d
 
 
 class Popularity(BaseRecommender):
