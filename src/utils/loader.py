@@ -196,6 +196,7 @@ class Dataset():
         icm matrix encoded as follows:
         AxI (A is the number of attributes and I is the number of items)
         """
+        return self.build_icm()
         icm = lil_matrix((self.attrs_number, self.tracks_number))
         duration_index = 0
         playcount_index = 0
