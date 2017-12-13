@@ -175,7 +175,7 @@ def linear_ensemble():
     # print optimal params
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
-    params = ['CSLIM', 'XBF', 'CBF', 'UBF', 'POP']
+    params = ['MF_BPR', 'MF_BPR_KNN', 'CBF', 'UBF', 'IBF', 'POP']
     for (p, x_) in zip(params, res.x):
         print('{}: {}'.format(p, x_))
 
