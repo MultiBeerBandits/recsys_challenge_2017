@@ -54,7 +54,7 @@ class ContentBasedFiltering(BaseRecommender):
         tags = applyTfIdf(tags, topK=55)
         tags.data = np.ones_like(tags.data)
         icm = vstack([icm, tags], format='csr')
-        icm = applyTfIdf(icm, norm='None')
+        icm = applyTfIdf(icm, norm=None)
         icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
         # build user content matrix
         # ucm = dataset.build_ucm()
