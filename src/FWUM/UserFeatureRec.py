@@ -31,10 +31,6 @@ class UserItemFiltering():
     Idea: two user are similar if the like items with similar features
     """
 
-    """
-    Result: MAP@5: 0.10272261177712429 with dot_chunked ufm 0.8 and ofm 0.2
-    """
-
     def __init__(self):
         self.pl_id_list = []
         self.tr_id_list = []
@@ -54,6 +50,9 @@ class UserItemFiltering():
 
         # get ICM from dataset
         icm = dataset.build_icm_2()
+        tags = dataset.build_tags_matrix()
+        tags = applyTfIdf(tags)
+        icm = vstack([icm, tags], format='csr')
         # icm = dataset.add_tracks_num_rating_to_icm(icm, urm).tocsr()
 
         # CONTENT BASED USER PROFILE
@@ -75,8 +74,45 @@ class UserItemFiltering():
         ufm = csr_matrix(ufm.multiply(Iu).transpose())
         print("UCM ready")
 
-        self.R_hat_fwum = compute_cosine(ufm.transpose()[[dataset.get_playlist_index_from_id(
-            x) for x in target_playlist]], icm[:, [dataset.get_track_index_from_id(x) for x in target_tracks]], k_filtering=500)
+        # build owner rating matrix
+        self.ucm = dataset.build_ucm()
+        orm = dataset.build_owner_item_matrix(self.ucm, urm)[[dataset.get_playlist_index_from_id(x) for x in target_playlist]]
+
+        # build owner feature matrix
+        # for each owner the average of the feature of its tracks
+        ofm = orm.dot(icm.transpose())
+
+        # usual normalization
+        Iu = orm.sum(axis=1)
+        # save from divide by zero!
+        Iu[Iu == 0] = 1
+        # since we have to divide the ufm get the reciprocal of this vector
+        Iu = np.reciprocal(Iu)
+        # multiply the ufm by Iu. Normalize OFM
+        ofm = csr_matrix(ofm.multiply(Iu))
+        # ofm is user x item feature
+        print("OFM ready")
+
+        # put together the user profile and the owner profile
+        # by doing a weighted average
+        ufm = ufm.multiply(0.9) + ofm.multiply(0.1)
+
+        # S = compute_cosine(ufm,
+        #                   ufm.transpose(),
+        #                   k_filtering=100)
+
+        # S = normalize_by_row(S)
+
+        # ufm_aug = S.dot(ufm[:, [dataset.get_playlist_index_from_id(
+        #    x) for x in target_playlist]])
+
+        ufm = ufm[:, [dataset.get_playlist_index_from_id(
+            x) for x in target_playlist]]
+
+        # restore original preferences
+       #ufm_aug[ufm.nonzero()] = ufm[ufm.nonzero()]
+
+        self.R_hat_fwum = compute_cosine(ufm.transpose(), icm[:, [dataset.get_track_index_from_id(x) for x in target_tracks]], k_filtering=500)
 
         # stack the urm
         # ufm = vstack([ufm, urm.transpose().multiply(2)], format='csr')
@@ -200,9 +236,16 @@ class UserItemFiltering():
         return vstack([artist, album, tags, duration, playcount], format='csr')
 
 
+def applyTfIdf(matrix):
+    transf = TfidfTransformer(norm='l1')
+    tfidf = transf.fit_transform(matrix.transpose())
+    tfidf = top_k_filtering(tfidf, 50).transpose()
+    return tfidf
+
+
 if __name__ == '__main__':
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights_2(1, 1, 0.1, 0.1, 0.1, num_rating_weight=1, inferred_album=1, inferred_duration=0.1, inferred_playcount=0.1)
+    ds.set_track_attr_weights_2(1, 1, 0.1, 0.1, 0, num_rating_weight=1, inferred_album=0.9, inferred_duration=0, inferred_playcount=0)
     # ds.set_playlist_attr_weights(0.1, 0.1, 0.1, 0.05, 0.05)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
