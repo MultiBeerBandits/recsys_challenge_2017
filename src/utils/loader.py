@@ -47,11 +47,11 @@ class Dataset():
         # track_attr_mapper maps attributes to row index
         # format: {'artist_id': {'artist_key': row_index}}
         # tag counter maps tags to its frequency normalized
-        #self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter = build_tracks_mappers_clusters(
-        #  self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
+        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter = build_tracks_mappers_clusters(
+          self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
         # extended version
-        self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter, self.album_artist_counter, self.album_artist = build_tracks_mappers_clusters_ext(
-             self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
+        # self.track_id_mapper, self.track_index_mapper, self.track_attr_mapper, self.attrs_number, self.tag_counter, self.album_artist_counter, self.album_artist = build_tracks_mappers_clusters_ext(
+        #     self.prefix + 'tracks_final.csv', self, load_tags, filter_tag)
         # build playlist mappers
         # playlist_id_mapper maps playlist id to columns of ucm
         # format: {'item_id': column_index}
@@ -142,6 +142,10 @@ class Dataset():
                 icm[artist_index, track_index] = self.artist_weight
                 # albums
                 albums = parse_csv_array(row['album'])
+                if len(albums) == 0:
+                    # add the None album of that artist
+                    album_index = self.track_attr_mapper['album'][artist_id + 'NONE']
+                    icm[album_index, track_index] = self.inferred_album_weight
                 for album in albums:
                     album_index = self.track_attr_mapper['album'][album]
                     icm[album_index, track_index] = self.album_weight
@@ -207,11 +211,6 @@ class Dataset():
                 # albums
                 albums = parse_csv_array(row['album'])
                 if len(albums) == 0:
-                    # set the album with more tracks of that artist
-                    # if artist_id in self.album_artist.keys():
-                    #     album = self.album_artist[artist_id][np.argmax(self.album_artist_counter[artist_id])]
-                    #     album_index = self.track_attr_mapper['album'][album]
-                    #     icm[album_index, track_index] = self.album_weight
                     # add the None album of that artist
                     album_index = self.track_attr_mapper['album'][artist_id + 'NONE']
                     icm[album_index, track_index] = self.inferred_album_weight
@@ -247,7 +246,6 @@ class Dataset():
                 # go ahead with duration index
                 duration_index += 1
                 # playcount
-                # playcount_offset = np.digitize(playcount, self.playcount_bins) - 1
                 # get the cluster
                 playcount_offset = self.playcount_cluster[playcount_index]
                 playcount_index_icm = self.track_attr_mapper['playcount'] + \
@@ -890,6 +888,12 @@ def build_tracks_mappers_clusters(path, dataset, load_tags=False, filter_tag=Fal
     for v in attrs['album']:
         mapper['album'][v] = attr_index
         attr_index += 1
+    # add artist values to album to represent None album of each artist
+    for v in attrs['artist_id']:
+         mapper['album'][v + 'NONE'] = attr_index
+         attr_index += 1
+    mapper['album']['NONE'] = attr_index
+    attr_index += 1
     # load tags only if specified and only if higher than pop threshold
     if load_tags:
         for v in attrs['tags']:

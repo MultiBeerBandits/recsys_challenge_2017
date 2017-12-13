@@ -149,6 +149,10 @@ def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=10
         result = sps.csr_matrix(dot_chunked(X, Y, k_filtering))
     return result
 
+def yadistance(X, Y):
+    # Yet another distance 
+    # <X,Y>/||X|| ||Y|| Where the norm is done on the common elements
+    pass
 
 def _work_compute_cosine(params):
     import os

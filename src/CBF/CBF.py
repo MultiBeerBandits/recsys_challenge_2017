@@ -43,29 +43,38 @@ class ContentBasedFiltering(BaseRecommender):
         print("CBF started")
 
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm_2()
+        icm = dataset.build_icm()
+        artist = dataset.build_artist_matrix(icm)
+        album = dataset.build_album_matrix(icm)
+        playcount = dataset.build_playcount_matrix(icm)
+        duration = dataset.build_duration_matrix(icm)
         # icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
         # urm_n = np.reciprocal(urm.sum(axis=1))
         # urm = csr_matrix(urm.multiply(urm_n))
         # rationale behind this. If in a playlist there are 1000 songs the similarity between them is low
         #urm_mod = applyTfIdf(urm, topK=1000)
 
+        #icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
+
         tags = dataset.build_tags_matrix()
         tags = applyTfIdf(tags, topK=55)
-        tags.data = np.ones_like(tags.data)
-        icm = vstack([icm, tags], format='csr')
-        icm = applyTfIdf(icm, norm=None)
+
+        playcount = applyTfIdf(playcount)
+        duration = applyTfIdf(duration)
+
+        icm = vstack([artist, album, playcount, duration, tags], format='csr')
         icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
         # build user content matrix
         # ucm = dataset.build_ucm()
 
-        # # build item user-feature matrix: UFxI
+        # build item user-feature matrix: UFxI
         # iucm = ucm.dot(urm)
 
         # iucm_norm = urm.sum(axis=0)
         # iucm_norm[iucm_norm == 0] = 1
         # iucm_norm = np.reciprocal(iucm_norm)
         # iucm = csr_matrix(iucm.multiply(iucm_norm))
+        # # for each item keep only top 100 user attributes
         # iucm = top_k_filtering(iucm.transpose(), 100).transpose()
         # icm = vstack([icm.multiply(2), iucm], format='csr')
         # applytfidf

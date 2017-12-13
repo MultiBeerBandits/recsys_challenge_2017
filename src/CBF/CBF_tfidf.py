@@ -56,7 +56,7 @@ class ContentBasedFiltering(BaseRecommender):
         urm = urm.tocsr()
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm_2()
+        icm = dataset.build_icm()
 
         # Build the tag matrix, apply TFIDF
         print("Build tags matrix and apply TFIDF...")
@@ -84,7 +84,7 @@ class ContentBasedFiltering(BaseRecommender):
                            k_filtering=self.k_filtering,
                            shrinkage=self.shrinkage,
                            n_threads=4,
-                           chunksize=300)
+                           chunksize=1000)
         s_norm = S.sum(axis=1)
 
         # Normalize S

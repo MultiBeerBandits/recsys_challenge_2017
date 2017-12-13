@@ -21,7 +21,7 @@ class ContentBasedFiltering():
         self.tr_id_list = []
 
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=50, k_filtering=200, alfa=0.9):
+    def fit(self, urm, target_playlist, target_tracks, dataset, shrinkage=10, k_filtering=200, alfa=0.95):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -59,7 +59,7 @@ class ContentBasedFiltering():
         iucm = ucm.dot(urm)
 
         # icm = vstack([icm.multiply(0), iucm], format='csr')
-        iucm = applyTfIdf(iucm)
+        iucm = applyTfIdf(iucm, 100)
 
         S_user = compute_cosine(iucm.transpose()[[dataset.get_track_index_from_id(x)
                                                    for x in self.tr_id_list]],

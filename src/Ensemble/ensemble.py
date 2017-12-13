@@ -8,10 +8,9 @@ from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.cluster import build_user_cluster
 from src.Pop.popularity import Popularity
 from src.FWUM.UICF import xSquared
-from src.CBF.CBF import ContentBasedFiltering
-from src.UBF.UBF import UserBasedFiltering
-from src.MF.iALS import IALS
-
+from src.CBF.CBF_tfidf import ContentBasedFiltering
+from src.IBF.IBF import ItemBasedFiltering
+from src.UBF.UBF2 import UserBasedFiltering
 
 
 class Ensemble(object):
@@ -99,6 +98,50 @@ class Ensemble(object):
             recs[pl_id] = tracks_ids
         return recs
 
+    def predict_interleave(self, params, at=5):
+        """
+        params is a vector of length of models
+        in the position of the model there's how many 
+        items to get from that model
+        """
+        recs_all = [model.predict() for model in self.models]
+        print("Length ", len(recs_all))
+        recs = {}
+        for i in range(0, len(self.pl_id_list)):
+            pl_id = self.pl_id_list[i]
+            tracks_ids = []
+            model_index = 0
+            while len(tracks_ids) < at:
+
+                # get the current model
+                model_index = model_index % len(self.models)
+
+                # track of the current model
+                track_ids = []
+
+                if len(recs_all[model_index][pl_id]) > 0:
+                    j = 0
+                    # here we need to get the items for that playlist
+                    while j < params[model_index] and len(recs_all[model_index][pl_id]) > 0:
+                        tr_id = recs_all[model_index][pl_id][0]
+                        if tr_id not in tracks_ids:
+                            track_ids.append(tr_id)
+                        recs_all[model_index][pl_id].remove(tr_id)
+                        j += 1
+
+                    # append the current tracks
+                    tracks_ids = tracks_ids + track_ids
+
+                model_index += 1
+
+            # get only the first slice of the list
+            tracks_ids = tracks_ids[:at]
+            recs[pl_id] = tracks_ids
+
+            if i % 1000 == 0:
+                print("Done: ", (i / len(self.pl_id_list)) * 100)
+        return recs
+
     def fit(self, urm, tg_tracks, tg_playlist, ds):
         """
         Fit all models
@@ -111,75 +154,49 @@ class Ensemble(object):
             model.fit(urm.copy(), tg_playlist, tg_tracks, ds)
 
     def fit_cluster(self, params):
-        ds = Dataset(load_tags=True, filter_tag=True)
-        ds.set_track_attr_weights(1, 0.9, 0.2, 0.2, 0.2)
-        ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
-        ev = Evaluator()
-        ev.cross_validation(5, ds.train_final.copy())
-        xbf = xSquared()
-        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-        xbf.fit(urm.copy(), tg_playlist, tg_tracks, ds)
-        recs_xbf = xbf.predict()
-        # Mix them all
-        models = [xbf]  # cbf, ubf]
-        R_hat_mixed = mix(models, params, normalize_ratings=False)
-        recs_mix = predict(R_hat_mixed, list(tg_playlist), list(tg_tracks))
-        map_5 = ev.evaluate_fold(recs_mix)
-
-        # multiply both
-        R_hat_mult = max_normalize(xbf.R_hat).multiply(
-            max_normalize(cbf.R_hat)).multiply(max_normalize(ubf.R_hat))
-        recs_mult = predict(R_hat_mult, list(tg_playlist), list(tg_tracks))
-        ev.evaluate_fold(recs_mult)
 
         print("MAP@5 :", map_5)
         return -map_5
 
 
 def main():
-    # Best params:
-    # XBF: 0.0033407193133514488
-    # CBF: 0.38028525074128705
-    # UBF: 0.00962408557454575
-    # IALS: 0.06898631305777138
-    ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
-    ds.set_playlist_attr_weights(0.5, 0.5, 0.5, 0.05, 0.05)
-    params = [0.30860, 0.85577, 0.07349, 0.03564, 0.00063265]
-    # create all the models
+    ds = Dataset(load_tags=True, filter_tag=False, weight_tag=False)
+    ds.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
+                                1.0, 1.0, 0.0, 0.0)
+    ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
+    ev = Evaluator(seed=False)
+    ev.cross_validation(5, ds.train_final.copy())
+    urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+
+    # create models
     cbf = ContentBasedFiltering()
-    xbf = xSquared()
-    ials = IALS(500, 50, 1e-4, 800)
     ubf = UserBasedFiltering()
-    # bpr_cslim = create_BPR_SLIM(urm, ds)
-    pop = Popularity()
+    ibf = ItemBasedFiltering()
 
     # add models to list of models
-    models = [xbf, cbf, ubf, ials, pop]
+    models = [cbf, ubf, ibf]
 
     # create the ensemble
-    ensemble = Ensemble(models)
+    ensemble = Ensemble(models, normalize_ratings=True)
 
-    # export csv
-    urm = ds.build_train_matrix()
-    tg_playlist = list(ds.target_playlists.keys())
-    tg_tracks = list(ds.target_tracks.keys())
-    # Train the model
-    ensemble.fit(urm,
-                 tg_tracks,
-                 tg_playlist,
-                 ds)
-    recs = ensemble.predict(params)
-    with open('submission_ensemble.csv', mode='w', newline='') as out:
-        fieldnames = ['playlist_id', 'track_ids']
-        writer = csv.DictWriter(out, fieldnames=fieldnames, delimiter=',')
-        writer.writeheader()
-        for k in tg_playlist:
-            track_ids = ''
-            for r in recs[k]:
-                track_ids = track_ids + r + ' '
-            writer.writerow({'playlist_id': k,
-                             'track_ids': track_ids[:-1]})
+    # call fit on ensemble to fit all models
+    ensemble.fit(urm, list(tg_tracks), list(tg_playlist), ds)
+
+    # Mix them all
+    recs_mix = ensemble.predict_interleave([2, 2, 1])
+    map_5 = ev.evaluate_fold(recs_mix)
+
+    recs_mix = ensemble.predict_interleave([3, 1, 1])
+    map_5 = ev.evaluate_fold(recs_mix)
+
+    recs_mix = ensemble.predict_interleave([1, 1, 1])
+    map_5 = ev.evaluate_fold(recs_mix)
+
+    recs_mix = ensemble.predict_interleave([2, 1, 2])
+    map_5 = ev.evaluate_fold(recs_mix)
+
+    recs_mix = ensemble.predict_interleave([3, 2, 1])
+    map_5 = ev.evaluate_fold(recs_mix)
 
 
 if __name__ == '__main__':

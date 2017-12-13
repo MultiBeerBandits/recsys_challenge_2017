@@ -9,7 +9,7 @@ from src.utils.matrix_utils import cluster_per_n_rating
 
 def main():
     ds = Dataset(load_tags=True, filter_tag=False, weight_tag=False)
-    ds.set_track_attr_weights_2(1, 1, 0, 0, 0, num_rating_weight=1, inferred_album=1, inferred_duration=0, inferred_playcount=0)
+    ds.set_track_attr_weights_2(1, 1, 0.01, 0.01, 0, num_rating_weight=1, inferred_album=1, inferred_duration=0, inferred_playcount=0)
     ds.set_playlist_attr_weights(1, 1, 1, 0, 0)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
