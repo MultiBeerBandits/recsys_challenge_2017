@@ -50,13 +50,12 @@ class ContentBasedFiltering(BaseRecommender):
         # rationale behind this. If in a playlist there are 1000 songs the similarity between them is low
         #urm_mod = applyTfIdf(urm, topK=1000)
 
-        icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
-
         tags = dataset.build_tags_matrix()
         tags = applyTfIdf(tags, topK=55)
         tags.data = np.ones_like(tags.data)
         icm = vstack([icm, tags], format='csr')
-        icm = applyTfIdf(icm, norm=None)
+        icm = applyTfIdf(icm, norm='None')
+        icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
         # build user content matrix
         # ucm = dataset.build_ucm()
 
