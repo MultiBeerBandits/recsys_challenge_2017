@@ -89,13 +89,16 @@ class UserItemFiltering():
         # since we have to divide the ufm get the reciprocal of this vector
         Iu = np.reciprocal(Iu)
         # multiply the ufm by Iu. Normalize OFM
-        ofm = csr_matrix(ofm.multiply(Iu))
+        ofm = csr_matrix(ofm.multiply(Iu).transpose())
         # ofm is user x item feature
         print("OFM ready")
 
         # put together the user profile and the owner profile
         # by doing a weighted average
-        ufm = ufm.multiply(0.9) + ofm.multiply(0.1)
+        ufm = ufm[:, [dataset.get_playlist_index_from_id(
+            x) for x in target_playlist]]
+
+        ufm = ufm.multiply(1) + ofm.multiply(0.1)
 
         # S = compute_cosine(ufm,
         #                   ufm.transpose(),
@@ -106,11 +109,9 @@ class UserItemFiltering():
         # ufm_aug = S.dot(ufm[:, [dataset.get_playlist_index_from_id(
         #    x) for x in target_playlist]])
 
-        ufm = ufm[:, [dataset.get_playlist_index_from_id(
-            x) for x in target_playlist]]
 
         # restore original preferences
-       #ufm_aug[ufm.nonzero()] = ufm[ufm.nonzero()]
+        # ufm_aug[ufm.nonzero()] = ufm[ufm.nonzero()]
 
         self.R_hat_fwum = compute_cosine(ufm.transpose(), icm[:, [dataset.get_track_index_from_id(x) for x in target_tracks]], k_filtering=500)
 
