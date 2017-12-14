@@ -140,7 +140,7 @@ def linear_ensemble():
     #             ds)
 
     # get R_hat
-    #r_hat_aug = cbf_aug.getR_hat()
+    # r_hat_aug = cbf_aug.getR_hat()
 
     # create all the models
     cbf = ContentBasedFiltering()
@@ -163,7 +163,7 @@ def linear_ensemble():
     models = [cbf, ubf, ibf, pop]
 
     # create the ensemble
-    ensemble = Ensemble(models, normalize_ratings=True)
+    ensemble = Ensemble(models, normalize_ratings=False)
 
     # call fit on ensemble to fit all models
     ensemble.fit(urm, list(tg_tracks), list(tg_playlist), ds)
