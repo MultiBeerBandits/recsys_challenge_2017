@@ -94,8 +94,8 @@ def result(res):
 
 def linear_ensemble():
     global ensemble, ev
-    space = [Integer(0, 1000),  # MF_BPR_CBF
-             Integer(0, 1000),  # MF_BPR_KNN
+    space = [# Integer(0, 1000),  # MF_BPR_CBF
+             # Integer(0, 1000),  # MF_BPR_KNN
              Integer(0, 1000),  # CBF
              Integer(0, 1000),  # UBF
              Integer(0, 1000),  # IBF
@@ -110,15 +110,20 @@ def linear_ensemble():
     # x5 = [0, 0, 0, 0, 0, 1]
 
     # initial values are the single recommenders
-    x0 = [1000, 0, 0, 0, 0, 0]
-    x1 = [0, 1000, 0, 0, 0, 0]
-    x2 = [0, 0, 1000, 0, 0, 0]
-    x3 = [0, 0, 0, 1000, 0, 0]
-    x4 = [0, 0, 0, 0, 1000, 0]
-    x5 = [0, 0, 0, 0, 0, 1000]
+    # x0 = [1000, 0, 0, 0, 0, 0]
+    # x1 = [0, 1000, 0, 0, 0, 0]
+    # x2 = [0, 0, 1000, 0, 0, 0]
+    # x3 = [0, 0, 0, 1000, 0, 0]
+    # x4 = [0, 0, 0, 0, 1000, 0]
+    # x5 = [0, 0, 0, 0, 0, 1000]
+
+    x0 = [1000, 0, 0, 0]
+    x1 = [0, 1000, 0, 0]
+    x2 = [0, 0, 1000, 0]
+    x3 = [0, 0, 0, 1000]
     #x6 = [0, 0, 0, 0, 0, 0, 1]
 
-    x0s = [x0, x1, x2, x3, x4, x5]
+    x0s = [x0, x1, x2, x3]
     # get the current fold
     ds = Dataset(load_tags=True, filter_tag=False, weight_tag=False)
     ds.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
@@ -129,21 +134,21 @@ def linear_ensemble():
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
 
     # augment r_hat
-    cbf_aug = CBF_AUG()
-    cbf_aug.fit(urm, tg_playlist,
-                tg_tracks,
-                ds)
+    # cbf_aug = CBF_AUG()
+    # cbf_aug.fit(urm, tg_playlist,
+    #             tg_tracks,
+    #             ds)
 
     # get R_hat
-    r_hat_aug = cbf_aug.getR_hat()
+    #r_hat_aug = cbf_aug.getR_hat()
 
     # create all the models
     cbf = ContentBasedFiltering()
     ubf = UserBasedFiltering()
     ibf = ItemBasedFiltering()
     pop = Popularity(20)
-    mf_bpr = MF_BPR_CBF(r_hat_aug)
-    mf_bpr_knn = MF_BPR_KNN(r_hat_aug)
+    # mf_bpr = MF_BPR_CBF(r_hat_aug)
+    # mf_bpr_knn = MF_BPR_KNN(r_hat_aug)
     # bpr = BPRSLIM(epochs=40,
     #               epochMultiplier=1,
     #               sgd_mode='rmsprop',
@@ -154,7 +159,8 @@ def linear_ensemble():
     #               urm_ext=R_hat)
 
     # add models to list of models
-    models = [mf_bpr, mf_bpr_knn, cbf, ubf, ibf, pop]
+    #models = [mf_bpr, mf_bpr_knn, cbf, ubf, ibf, pop]
+    models = [cbf, ubf, ibf, pop]
 
     # create the ensemble
     ensemble = Ensemble(models, normalize_ratings=True)
@@ -175,7 +181,7 @@ def linear_ensemble():
     # print optimal params
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
-    params = ['MF_BPR', 'MF_BPR_KNN', 'CBF', 'UBF', 'IBF', 'POP']
+    params = ['CBF', 'UBF', 'IBF', 'POP']
     for (p, x_) in zip(params, res.x):
         print('{}: {}'.format(p, x_))
 
