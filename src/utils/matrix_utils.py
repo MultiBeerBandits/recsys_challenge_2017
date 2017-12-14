@@ -149,9 +149,65 @@ def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=10
         result = sps.csr_matrix(dot_chunked(X, Y, k_filtering))
     return result
 
-def yadistance(X, Y):
+
+def yadistance(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=100, normalize=True):
     # Yet another distance 
-    # <X,Y>/||X|| ||Y|| Where the norm is done on the common elements
+    # <X,Y>/||X|| Where the norm is done on the common elements
+    """
+    Returns X_shape[0]xY_shape[1]
+    """
+    if sps.issparse(X):
+        from scipy.sparse.linalg import norm
+        import multiprocessing as mp
+
+        if normalize:
+            y_norm = norm(Y, axis=0)
+            y_norm[y_norm == 0] = 1
+            Y = Y.multiply(np.reciprocal(y_norm))
+        Y_ones = Y.copy()
+        Y_ones.data = np.ones_like(Y_ones.data)
+
+        if n_threads == 0:
+            n_threads = mp.cpu_count()
+
+        worker_matrix_chunks = []
+        worker_chunksize = X.shape[0] // n_threads
+        for i in range(0, X.shape[0], worker_chunksize):
+            if i + worker_chunksize > X.shape[0]:
+                end = X.shape[0]
+            else:
+                end = i + worker_chunksize
+            worker_matrix_chunks.append({'start': i, 'end': end})
+
+        # Build a list of parameters to ship to pool workers
+        separated_tasks = []
+        for chunk in worker_matrix_chunks:
+            separated_tasks.append([chunk,
+                                    X,
+                                    Y,
+                                    Y_ones,
+                                    k_filtering,
+                                    shrinkage,
+                                    chunksize])
+
+        result = None
+        with mp.Pool(n_threads) as pool:
+            print('Running {:d} workers...'.format(n_threads))
+            submatrices = pool.map(_work_compute_cosine, separated_tasks)
+            submatrices.sort(key=lambda x: x['start'])
+
+            for submatrix in submatrices:
+                if result is None:
+                    result = submatrix['result']
+                else:
+                    result = sps.vstack([result, submatrix['result']])
+    else:
+        from scipy.linalg import norm
+        y_norm = norm(Y, axis=0)
+        y_norm[y_norm == 0] = 1
+        Y = np.multiply(Y, np.reciprocal(y_norm))
+        result = sps.csr_matrix(dot_chunked(X, Y, k_filtering))
+    return result
     pass
 
 def _work_compute_cosine(params):
