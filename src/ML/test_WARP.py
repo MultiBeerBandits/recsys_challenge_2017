@@ -3,7 +3,7 @@ from scipy.sparse import *
 from src.utils.evaluator import *
 import numpy as np
 from src.CBF.CBF_MF import *
-from src.MF.MF_BPR.MF_BPR import MF_BPR
+from src.ML.WARP_aug import WARP
 from itertools import product
 from sparsesvd import sparsesvd
 from src.utils.matrix_utils import top_k_filtering
@@ -28,33 +28,15 @@ def main():
         # 0.04349393048329915 with 1000 factors
         # 0.06658599110306855 with 2500 factors
         ds.set_track_attr_weights_2(1, 1, 1, 1, 1, num_rating_weight=1, inferred_album=1, inferred_duration=1, inferred_playcount=1)
-        # icm = ds.build_icm_2()
-        # svd_matrix = vstack([R_hat, icm], format='csc')
-        # u, s, v = sparsesvd(svd_matrix, 1000)
-        # # numpy.dot(ut.T, numpy.dot(numpy.diag(s), vt))
-        # R_hat_new = csr_matrix(_worker_dot_chunked(np.dot(u.T[[ds.get_playlist_index_from_id(x) for x in list(tg_playlist)]], np.diag(s)), v[:,[ds.get_track_index_from_id(x) for x in list(tg_tracks)]], topK=100))
 
-        # urm_cleaned = urm[[ds.get_playlist_index_from_id(x) for x in list(tg_playlist)]]
-        # urm_cleaned = urm_cleaned[:, [ds.get_track_index_from_id(x) for x in list(tg_tracks)]]
-        # R_hat_new[urm_cleaned.nonzero()] = 0
-
-        # # # test if svd is ok
-        # recs = predict(R_hat_new, list(tg_playlist), list(tg_tracks))
-        # ev.evaluate_fold(recs)
-
-        mf = MF_BPR()
+        warp = WARP()
 
         # call fit on mf bpr
         for epoch in range(50):
             # MAP@5: 0.08256503053607782 with 500 factors after 10 epochs
             # MAP@5: 0.08594586443489391 with 500 factors afetr 4 epochs no_components=500, epoch_multiplier=2, l_rate=1e-2
-            mf.fit(R_hat, ds, list(tg_playlist), list(tg_tracks), n_epochs=1, no_components=500, epoch_multiplier=2, l_rate=1e-2, use_icm=True)
-            recs = mf.predict_dot_custom(urm)
-            ev.evaluate_fold(recs)
-
-            # MAP@5: 0.09407901681369218 with neighborhood
-            # MAP@5: 0.09854105406016736 with neighborhood after 4 epochs
-            recs = mf.predict_knn_custom(urm)
+            warp.fit(R_hat, ds, list(tg_playlist), list(tg_tracks))
+            recs = warp.predict_custom(urm)
             ev.evaluate_fold(recs)
 
     map_at_five = ev.get_mean_map()

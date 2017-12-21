@@ -10,7 +10,7 @@ from src.utils.matrix_utils import compute_cosine, top_k_filtering, max_normaliz
 from src.utils.BaseRecommender import BaseRecommender
 from src.utils.plotter import visualize_2d
 from src.Pop.popularity import Popularity
-from src.CBF.CBF import ContentBasedFiltering
+from src.CBF.CBF_tfidf import ContentBasedFiltering
 
 
 class PopularityCBF(BaseRecommender):
@@ -47,7 +47,7 @@ class PopularityCBF(BaseRecommender):
         cbf.fit(urm, target_playlist, target_tracks, dataset)
 
         R_hat_cbf = cbf.getR_hat()
-        R_hat_cbf = top_k_filtering(R_hat_cbf, 10)
+        R_hat_cbf = top_k_filtering(R_hat_cbf, 20)
 
         # mix the two predictions
         self.R_hat = R_hat_cbf.multiply(R_hat_pop)
@@ -93,8 +93,11 @@ def main():
     # best_artist_w = 0
     # shr_w = 100
     # k_f = 50
-    ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights_2(1, 0.9, 0.2, 0.2, 0.2, 0.1, 0.8, 0.1, 0.1)
+    ds = Dataset(load_tags=True,
+                      filter_tag=False,
+                      weight_tag=False)
+    ds.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
+                                     1.0, 1.0, 0.0, 0.0)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     pop = PopularityCBF()

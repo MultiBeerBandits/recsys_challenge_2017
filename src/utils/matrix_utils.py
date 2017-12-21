@@ -1,6 +1,7 @@
 import scipy.sparse as sps
 import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.loader import *
 
 
@@ -38,7 +39,7 @@ def cluster_per_n_rating(urm, tg_playlist, ds, n_cluster):
 
 
 def cluster_per_ucm(urm, tg_playlist, ds, n_cluster):
-    icm = ds.build_icm()
+    icm = ds.build_icm_2()
     ucm = ds.build_ucm().transpose()
 
     # get uicm: Users x Features
@@ -82,7 +83,7 @@ def cluster_per_uicm(urm, tg_playlist, ds, n_cluster):
     return ucm_cluster
 
 
-def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=100):
+def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=100, normalize=True):
     """
     Returns X_shape[0]xY_shape[1]
     """
@@ -90,12 +91,13 @@ def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=10
         from scipy.sparse.linalg import norm
         import multiprocessing as mp
 
-        x_norm = norm(X, axis=1)
-        x_norm[x_norm == 0] = 1
-        X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)).transpose())
-        y_norm = norm(Y, axis=0)
-        y_norm[y_norm == 0] = 1
-        Y = Y.multiply(np.reciprocal(y_norm))
+        if normalize:
+            x_norm = norm(X, axis=1)
+            x_norm[x_norm == 0] = 1
+            X = X.multiply(sps.csr_matrix(np.reciprocal(x_norm)).transpose())
+            y_norm = norm(Y, axis=0)
+            y_norm[y_norm == 0] = 1
+            Y = Y.multiply(np.reciprocal(y_norm))
         Y_ones = Y.copy()
         Y_ones.data = np.ones_like(Y_ones.data)
 
@@ -147,6 +149,66 @@ def compute_cosine(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=10
         result = sps.csr_matrix(dot_chunked(X, Y, k_filtering))
     return result
 
+
+def yadistance(X, Y, k_filtering, shrinkage=False, n_threads=0, chunksize=100, normalize=True):
+    # Yet another distance 
+    # <X,Y>/||X|| Where the norm is done on the common elements
+    """
+    Returns X_shape[0]xY_shape[1]
+    """
+    if sps.issparse(X):
+        from scipy.sparse.linalg import norm
+        import multiprocessing as mp
+
+        if normalize:
+            y_norm = norm(Y, axis=0)
+            y_norm[y_norm == 0] = 1
+            Y = Y.multiply(np.reciprocal(y_norm))
+        Y_ones = Y.copy()
+        Y_ones.data = np.ones_like(Y_ones.data)
+
+        if n_threads == 0:
+            n_threads = mp.cpu_count()
+
+        worker_matrix_chunks = []
+        worker_chunksize = X.shape[0] // n_threads
+        for i in range(0, X.shape[0], worker_chunksize):
+            if i + worker_chunksize > X.shape[0]:
+                end = X.shape[0]
+            else:
+                end = i + worker_chunksize
+            worker_matrix_chunks.append({'start': i, 'end': end})
+
+        # Build a list of parameters to ship to pool workers
+        separated_tasks = []
+        for chunk in worker_matrix_chunks:
+            separated_tasks.append([chunk,
+                                    X,
+                                    Y,
+                                    Y_ones,
+                                    k_filtering,
+                                    shrinkage,
+                                    chunksize])
+
+        result = None
+        with mp.Pool(n_threads) as pool:
+            print('Running {:d} workers...'.format(n_threads))
+            submatrices = pool.map(_work_compute_cosine, separated_tasks)
+            submatrices.sort(key=lambda x: x['start'])
+
+            for submatrix in submatrices:
+                if result is None:
+                    result = submatrix['result']
+                else:
+                    result = sps.vstack([result, submatrix['result']])
+    else:
+        from scipy.linalg import norm
+        y_norm = norm(Y, axis=0)
+        y_norm[y_norm == 0] = 1
+        Y = np.multiply(Y, np.reciprocal(y_norm))
+        result = sps.csr_matrix(dot_chunked(X, Y, k_filtering))
+    return result
+    pass
 
 def _work_compute_cosine(params):
     import os
@@ -324,6 +386,17 @@ def writeSubmission(fileName, recs, tg_playlist):
 def write_icm_to_file():
     dataset = Dataset(load_tags=True, filter_tag=True)
     dataset.writeICM('new_icm.csv')
+
+def applyTfIdf(matrix, topK=False):
+    """
+    Matrix: Features x Sample
+    """
+    transf = TfidfTransformer(norm='l1')
+    tfidf = transf.fit_transform(matrix.transpose())
+    if topK:
+        print("Doing topk")
+        tfidf = top_k_filtering(tfidf, topK)
+    return tfidf.transpose()
 
 
 if __name__ == '__main__':

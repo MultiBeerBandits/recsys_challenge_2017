@@ -13,7 +13,6 @@ from src.utils.BaseRecommender import BaseRecommender
 class ContentBasedFiltering(BaseRecommender):
 
     """
-    
     """
 
     def __init__(self, shrinkage=10, k_filtering=100):
@@ -74,7 +73,8 @@ class ContentBasedFiltering(BaseRecommender):
         S = compute_cosine(icm.transpose(),
                            icm,
                            k_filtering=self.k_filtering,
-                           shrinkage=self.shrinkage)
+                           shrinkage=self.shrinkage,
+                           chunksize=1000)
         s_norm = S.sum(axis=1)
         # normalize s
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))

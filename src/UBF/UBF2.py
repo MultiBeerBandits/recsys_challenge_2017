@@ -47,7 +47,7 @@ class UserBasedFiltering(BaseRecommender):
         ucm = dataset.build_ucm()
 
         # add user ratings to ucm
-        ucm = vstack([ucm, urm.transpose()], format='csr')
+        ucm = vstack([urm.transpose()], format='csr')
 
         # compute cosine similarity between users
         S = compute_cosine(ucm.transpose()[[dataset.get_playlist_index_from_id(x)

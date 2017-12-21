@@ -4,9 +4,16 @@ import numpy as np
 import numpy.linalg as LA
 from sklearn.decomposition import TruncatedSVD
 from src.utils.BaseRecommender import BaseRecommender
-from src.utils.matrix_utils import dot_chunked_single
+from src.utils.matrix_utils import dot_chunked_single, top_k_filtering
 
-
+# map@5 around 0.055 with owner feature
+# MAP@5: 0.056282892256653706 with owner features weighted 0.1 and following weights:
+# ds.set_track_attr_weights_2(1, 1, 0.2, 0.2, 0.2, num_rating_weight=1, inferred_album=1, inferred_duration=0.2, inferred_playcount=0.2)
+#    ds.set_playlist_attr_weights(0.5, 0.5, 0.9, 0.01, 0.01)
+# MAP@5: 0.06349845434667863 with ds.set_track_attr_weights_2(1, 1, 0.2, 0.2, 0.2, num_rating_weight=1, inferred_album=1, inferred_duration=0.2, inferred_playcount=0.2)
+# ds.set_playlist_attr_weights(0.2, 0.5, 0.9, 0.01, 0.01)
+# MAP@5: 0.08118676015984323 with icm weighted 5 more the ucm
+# MAP@5: 0.08560205081806521 with icm weighted 10 (worst with 20 weights)
 class xSquared(BaseRecommender):
     """
     Rationale:
@@ -56,25 +63,26 @@ class xSquared(BaseRecommender):
 
         # CONTENT BASED USER PROFILE
         # build the user feature matrix
-        ufm = self.urm.dot(self.icm.transpose())
+        ufm = self.urm[[dataset.get_playlist_index_from_id(x) for x in target_playlist]].dot(self.icm.transpose())
 
         # Iu contains for each user the number of tracks rated
-        Iu = urm.sum(axis=1)
+        Iu = urm[[dataset.get_playlist_index_from_id(x) for x in target_playlist]].sum(axis=1)
         # save from divide by zero!
         Iu[Iu == 0] = 1
         # since we have to divide the ufm get the reciprocal of this vector
         Iu = np.reciprocal(Iu)
         # multiply the ufm by Iu. Normalize UFM
-        ufm = np.multiply(ufm, Iu)
+        ufm = csr_matrix(ufm.multiply(Iu))
+        # ufm is user x item feature
         self.ufm = ufm
-        print("User feature matrix built done")
+        print("User feature matrix done")
 
         # build owner rating matrix
-        orm = dataset.build_owner_item_matrix(self.icm, urm)
+        orm = dataset.build_owner_item_matrix(self.ucm, urm)[[dataset.get_playlist_index_from_id(x) for x in target_playlist]]
 
         # build owner feature matrix
         # for each owner the average of the feature of its tracks
-        ofm = orm.dot(icm.transpose()).transpose()
+        ofm = orm.dot(self.icm.transpose())
 
         # usual normalization
         Iu = orm.sum(axis=1)
@@ -82,40 +90,48 @@ class xSquared(BaseRecommender):
         Iu[Iu == 0] = 1
         # since we have to divide the ufm get the reciprocal of this vector
         Iu = np.reciprocal(Iu)
-        # multiply the ufm by Iu. Normalize UFM
+        # multiply the ufm by Iu. Normalize OFM
+        ofm = csr_matrix(ofm.multiply(Iu))
+        # ofm is user x item feature
         print("OFM ready")
-        ofm = ofm.multiply(Iu).transpose()
 
         # put together the user profile and the owner profile
         # by doing a weighted average
-        ufm = ufm.multiply(0.8) + ofm.multiply(0.2)
+        ufm = ufm.multiply(0.9) + ofm.multiply(0.1)
 
         # now stack ucm and ufm
-        ucm_ext = vstack([ufm,
-                          self.ucm],
+        ucm_ext = vstack([ufm.transpose().multiply(10),
+                          self.ucm[:, [dataset.get_playlist_index_from_id(x)
+                                       for x in target_playlist]]],
                          format='csr')
         print("UCM ready")
 
         # now build the item user content matrix
-        iucm = ucm.dot(urm) # User Feature x Items
+        # User Feature x tg_Items
+        iucm = self.ucm.dot(urm[:,
+                                [dataset.get_track_index_from_id(x)
+                                 for x in target_tracks]])
 
         # usual normalization
-        Iu = urm.sum(axis=0)
+        Iu = urm[:,
+                 [dataset.get_track_index_from_id(x)
+                  for x in target_tracks]].sum(axis=0)
         # save from divide by zero!
         Iu[Iu == 0] = 1
         # since we have to divide the ufm get the reciprocal of this vector
         Iu = np.reciprocal(Iu)
-        # multiply the ufm by Iu. Normalize UFM
-        print("OFM ready")
-        iucm = iucm.multiply(Iu)
+        # multiply the ufm by Iu. Normalize IUCM
+        iucm = csr_matrix(iucm.multiply(Iu))
+        print("IUCM ready")
 
         # now stack icm and user content matrix
-        icm_ext = vstack([self.icm,
+        icm_ext = vstack([self.icm[:, [dataset.get_track_index_from_id(x)
+                                       for x in target_tracks]].multiply(10),
                           iucm],
                          format='csr')
 
-        ucm_ext = ucm_ext[:, [dataset.get_platlist_index_from_id(x) for x in target_playlist]]
-        icm_ext = icm_ext[:, [dataset.get_platlist_index_from_id(x) for x in target_tracks]]
+        #ucm_ext = ucm_ext[:, [dataset.get_playlist_index_from_id(x) for x in target_playlist]]
+        #icm_ext = icm_ext[:, [dataset.get_track_index_from_id(x) for x in target_tracks]]
 
         # now compute the dot product
         R_hat = dot_chunked_single(ucm_ext.transpose(), icm_ext, topK=500)
@@ -127,7 +143,7 @@ class xSquared(BaseRecommender):
         R_hat[urm.nonzero()] = 0
         R_hat.eliminate_zeros()
         print("R_hat done")
-        self.R_hat = R_hat
+        self.R_hat = top_k_filtering(R_hat, 100)
 
     def predict(self, at=5):
         """

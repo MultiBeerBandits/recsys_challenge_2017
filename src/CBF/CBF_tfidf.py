@@ -21,6 +21,8 @@ class ContentBasedFiltering(BaseRecommender):
         + TOP-55 (TFIDF (tags 1.0))
         MAP@5 0.11897304011860126
         Public leaderboard: 0.09616
+
+
     """
 
     def __init__(self, shrinkage=10, k_filtering=100):
@@ -54,7 +56,7 @@ class ContentBasedFiltering(BaseRecommender):
         urm = urm.tocsr()
         print("CBF started")
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm_2()
+        icm = dataset.build_icm()
 
         # Build the tag matrix, apply TFIDF
         print("Build tags matrix and apply TFIDF...")
@@ -66,8 +68,15 @@ class ContentBasedFiltering(BaseRecommender):
         # natural noise added by such sparse features.
         tags = top_k_filtering(tags.transpose(), topK=55).transpose()
 
+        # User augmented UCM
+        # print("Building User augmented ICM")
+        # ucm = dataset.build_ucm()
+        # ua_icm = user_augmented_icm(urm, ucm)
+        # ua_icm = top_k_filtering(ua_icm.transpose(), topK=55).transpose()
+
         # stack all
         icm = vstack([icm, tags, urm * 0.8], format='csr')
+        # icm = vstack([icm, tags, applyTFIDF(urm)], format='csr')
 
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
                                             for x in self.tr_id_list]],
@@ -75,7 +84,7 @@ class ContentBasedFiltering(BaseRecommender):
                            k_filtering=self.k_filtering,
                            shrinkage=self.shrinkage,
                            n_threads=4,
-                           chunksize=300)
+                           chunksize=1000)
         s_norm = S.sum(axis=1)
 
         # Normalize S
@@ -179,7 +188,9 @@ def evaluateMap():
                       weight_tag=False)
     dataset.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
                                      1.0, 1.0, 0.0, 0.0)
-    ev = Evaluator()
+    # seed = 0xcafebabe
+    # print("Evaluating with initial seed: {}".format(seed))
+    ev = Evaluator(seed=False)
     ev.cross_validation(5, dataset.train_final.copy())
     cbf = ContentBasedFiltering()
     for i in range(0, 5):
@@ -193,6 +204,11 @@ def evaluateMap():
 
     map_at_five = ev.get_mean_map()
     print("MAP@5 ", map_at_five)
+
+
+def crossValidation():
+    from src.utils.evaluator import Evaluator
+    pass
 
 
 if __name__ == '__main__':

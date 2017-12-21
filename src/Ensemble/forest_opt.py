@@ -7,12 +7,12 @@ from src.utils.evaluator import *
 from src.Ensemble.ensemble import Ensemble
 from src.Ensemble.simEnsemble import SimEnsemble
 from src.CBF.CBF_tfidf import ContentBasedFiltering
-from src.UBF.UBF_CBF import UBF
+from src.UBF.UBF2 import UserBasedFiltering
 from src.SLIM_BPR.Cython.SLIM_BPR_Cython import SLIM_BPR_Cython
 from src.Pop.popularity import Popularity
 from src.MF.MF_BPR.MF_BPR_CBF import MF_BPR_CBF
 from src.MF.MF_BPR.MF_BPR_KNN import MF_BPR_KNN
-from src.CBF.CBF_4 import IBF
+from src.IBF.IBF import ItemBasedFiltering
 from src.CBF.CBF_MF import ContentBasedFiltering as CBF_AUG
 from src.ML.BPRSLIM_ext import BPRSLIM
 # Logging stuff
@@ -64,6 +64,17 @@ def objective(params):
 
     return out
 
+def int_objective(params):
+    global ensemble, ev
+    print("Current params", str(params))
+
+    recs = ensemble.predict_interleaved(params)
+    map_at_five = ev.evaluate_fold(recs)
+    # Make negative because we want to _minimize_ objective
+    out = -map_at_five
+
+    return out
+
 
 def sim_objective(params):
     global sim_ensemble, ev
@@ -83,8 +94,8 @@ def result(res):
 
 def linear_ensemble():
     global ensemble, ev
-    space = [Integer(0, 1000),  # MF_BPR_CBF
-             Integer(0, 1000),  # MF_BPR_KNN
+    space = [# Integer(0, 1000),  # MF_BPR_CBF
+             # Integer(0, 1000),  # MF_BPR_KNN
              Integer(0, 1000),  # CBF
              Integer(0, 1000),  # UBF
              Integer(0, 1000),  # IBF
@@ -99,40 +110,47 @@ def linear_ensemble():
     # x5 = [0, 0, 0, 0, 0, 1]
 
     # initial values are the single recommenders
-    x0 = [1, 0, 0, 0, 0, 0]
-    x1 = [0, 1, 0, 0, 0, 0]
-    x2 = [0, 0, 1, 0, 0, 0]
-    x3 = [0, 0, 0, 1, 0, 0]
-    x4 = [0, 0, 0, 0, 1, 0]
-    x5 = [0, 0, 0, 0, 0, 1]
+    # x0 = [1000, 0, 0, 0, 0, 0]
+    # x1 = [0, 1000, 0, 0, 0, 0]
+    # x2 = [0, 0, 1000, 0, 0, 0]
+    # x3 = [0, 0, 0, 1000, 0, 0]
+    # x4 = [0, 0, 0, 0, 1000, 0]
+    # x5 = [0, 0, 0, 0, 0, 1000]
+
+    x0 = [1000, 0, 0, 0]
+    x1 = [0, 1000, 0, 0]
+    x2 = [0, 0, 1000, 0]
+    x3 = [0, 0, 0, 100]
     #x6 = [0, 0, 0, 0, 0, 0, 1]
 
-    x0s = [x0, x1, x2, x3, x4, x5]
+    x0s = [x0, x1, x2, x3]
     # get the current fold
-    ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights_2(1, 1, 0, 0, 1, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
+    ds = Dataset(load_tags=True, filter_tag=False, weight_tag=False)
+    ds.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
+                                1.0, 1.0, 0.0, 0.0)
+    ds.set_playlist_attr_weights(1, 1, 1, 1, 1)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
 
     # augment r_hat
-    cbf_aug = CBF_AUG()
-    cbf_aug.fit(urm, tg_playlist,
-                tg_tracks,
-                ds)
+    # cbf_aug = CBF_AUG()
+    # cbf_aug.fit(urm, tg_playlist,
+    #             tg_tracks,
+    #             ds)
 
     # get R_hat
-    r_hat_aug = cbf_aug.getR_hat()
+    # r_hat_aug = cbf_aug.getR_hat()
 
     # create all the models
     cbf = ContentBasedFiltering()
-    ubf = UBF(r_hat_aug)
-    ibf = IBF(r_hat_aug)
+    ubf = UserBasedFiltering()
+    ibf = ItemBasedFiltering()
     pop = Popularity(20)
-    mf_bpr = MF_BPR_CBF(r_hat_aug)
-    mf_bpr_knn = MF_BPR_KNN(r_hat_aug)
-    # bpr = BPRSLIM(epochs=2,
-    #               epochMultiplier=10,
+    # mf_bpr = MF_BPR_CBF(r_hat_aug)
+    # mf_bpr_knn = MF_BPR_KNN(r_hat_aug)
+    # bpr = BPRSLIM(epochs=40,
+    #               epochMultiplier=1,
     #               sgd_mode='rmsprop',
     #               learning_rate=5e-08,
     #               topK=300,
@@ -141,10 +159,11 @@ def linear_ensemble():
     #               urm_ext=R_hat)
 
     # add models to list of models
-    models = [mf_bpr, mf_bpr_knn, cbf, ubf, ibf, pop]
+    #models = [mf_bpr, mf_bpr_knn, cbf, ubf, ibf, pop]
+    models = [cbf, ubf, ibf, pop]
 
     # create the ensemble
-    ensemble = Ensemble(models, normalize_ratings=True)
+    ensemble = Ensemble(models, normalize_ratings=False)
 
     # call fit on ensemble to fit all models
     ensemble.fit(urm, list(tg_tracks), list(tg_playlist), ds)
@@ -162,9 +181,10 @@ def linear_ensemble():
     # print optimal params
     print('Maximimum p@k found: {:6.5f}'.format(-res.fun))
     print('Optimal parameters:')
-    params = ['CSLIM', 'XBF', 'CBF', 'UBF', 'POP']
+    params = ['CBF', 'UBF', 'IBF', 'POP']
     for (p, x_) in zip(params, res.x):
         print('{}: {}'.format(p, x_))
+
 
 def opt_sim_ensemble():
     global sim_ensemble, ev

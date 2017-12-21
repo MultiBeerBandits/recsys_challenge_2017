@@ -9,9 +9,10 @@ from src.utils.matrix_utils import compute_cosine, top_k_filtering
 from src.utils.BaseRecommender import BaseRecommender
 
 
+# 0.1187796227953781
 class ContentBasedFiltering(BaseRecommender):
 
-    def __init__(self, shrinkage=10, k_filtering=200):
+    def __init__(self, shrinkage=10, k_filtering=100):
         # final matrix of predictions
         self.R_hat = None
 
@@ -23,7 +24,7 @@ class ContentBasedFiltering(BaseRecommender):
         self.shrinkage = shrinkage
         self.k_filtering = k_filtering
 
-    def fit(self, urm, target_playlist, target_tracks, dataset, urm_weight=0.4):
+    def fit(self, urm, target_playlist, target_tracks, dataset, urm_weight=0.8):
         """
         urm: user rating matrix
         target playlist is a list of playlist id
@@ -42,14 +43,48 @@ class ContentBasedFiltering(BaseRecommender):
         print("CBF started")
 
         # get ICM from dataset, assume it already cleaned
-        icm = dataset.build_icm_2()
-        icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
+        icm = dataset.build_icm()
+        artist = dataset.build_artist_matrix(icm)
+        album = dataset.build_album_matrix(icm)
+        playcount = dataset.build_playcount_matrix(icm)
+        duration = dataset.build_duration_matrix(icm)
+        # icm = dataset.add_tracks_num_rating_to_icm(icm, urm)
+        # urm_n = np.reciprocal(urm.sum(axis=1))
+        # urm = csr_matrix(urm.multiply(urm_n))
+        # rationale behind this. If in a playlist there are 1000 songs the similarity between them is low
+        #urm_mod = applyTfIdf(urm, topK=1000)
+
+        #icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
+
+        tags = dataset.build_tags_matrix()
+        tags = applyTfIdf(tags, topK=55)
+
+        playcount = applyTfIdf(playcount)
+        duration = applyTfIdf(duration)
+
+        icm = vstack([artist, album, playcount, duration, tags], format='csr')
         icm = dataset.add_playlist_to_icm(icm, urm, urm_weight)
+        # build user content matrix
+        # ucm = dataset.build_ucm()
+
+        # build item user-feature matrix: UFxI
+        # iucm = ucm.dot(urm)
+
+        # iucm_norm = urm.sum(axis=0)
+        # iucm_norm[iucm_norm == 0] = 1
+        # iucm_norm = np.reciprocal(iucm_norm)
+        # iucm = csr_matrix(iucm.multiply(iucm_norm))
+        # # for each item keep only top 100 user attributes
+        # iucm = top_k_filtering(iucm.transpose(), 100).transpose()
+        # icm = vstack([icm.multiply(2), iucm], format='csr')
+        # applytfidf
+        # icm = TfidfTransformer(norm='l1').fit_transform(icm.transpose()).transpose()
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
                                             for x in self.tr_id_list]],
                            icm,
                            k_filtering=self.k_filtering,
-                           shrinkage=self.shrinkage)
+                           shrinkage=self.shrinkage,
+                           chunksize=1000)
         s_norm = S.sum(axis=1)
 
         # normalize s
@@ -68,7 +103,7 @@ class ContentBasedFiltering(BaseRecommender):
                                       for x in self.tr_id_list]]
         R_hat[urm_cleaned.nonzero()] = 0
         R_hat.eliminate_zeros()
-        self.R_hat = R_hat
+        self.R_hat = top_k_filtering(R_hat, 20)
 
     def getW(self):
         """
@@ -98,9 +133,17 @@ class ContentBasedFiltering(BaseRecommender):
     def getR_hat(self):
         return self.R_hat
 
-
     def get_model(self):
         """
         Returns the complete R_hat
         """
         return self.R_hat.copy()
+
+
+def applyTfIdf(matrix, topK=False, norm='l1'):
+    transf = TfidfTransformer(norm=norm)
+    tfidf = transf.fit_transform(matrix.transpose())
+    if topK:
+        print("Doing topk")
+        tfidf = top_k_filtering(tfidf, topK)
+    return tfidf.transpose()

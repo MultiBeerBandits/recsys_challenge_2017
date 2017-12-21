@@ -25,6 +25,9 @@ class Evaluator(object):
         # a dictionary containing for each playlist its map@5
         self.map_playlists = {}
 
+        # The map_playlist for each fold
+        self.maps_per_fold = []
+
         self.folds = 0
 
         # Set the initial seed if specified
@@ -46,6 +49,7 @@ class Evaluator(object):
             self.test_dictionaries.append({})
             self.target_tracks.append(list())
             self.evaluations.append(0)
+            self.maps_per_fold.append(0)
 
         # get the size of training set
         training_set_size = sum(
@@ -119,12 +123,13 @@ class Evaluator(object):
 
         return test_M
 
-    def evaluate_fold(self, recommendation):
+    def evaluate_fold(self, recommendation, at=5):
         """
         recommendation is the dictionary of recommendation {'playlist ': list}
         For each playlist in test_dictionary[current_fold] evaluate MAP
         """
         if self.current_fold_index < self.folds:
+            self.map_playlists.clear()
             cumulated_ap = 0
             for pl_id in self.test_dictionaries[self.current_fold_index].keys():
                 # avg precision
@@ -141,12 +146,17 @@ class Evaluator(object):
                             print("WARNING: Track not in target tracks!")
                     item_number += 1
                 # save the map@5 into the dictionary
-                self.map_playlists[pl_id] = ap / 5
-                cumulated_ap = cumulated_ap + (ap / 5)
+                self.map_playlists[pl_id] = ap / at
+                cumulated_ap = cumulated_ap + (ap / at)
+
             map_at_five = cumulated_ap / \
                 len(self.test_dictionaries[self.current_fold_index].keys())
+
             print("MAP@5: " + str(map_at_five), flush=True)
-            self.evaluations[self.current_fold_index] = map_at_five
+
+            fold_index = self.current_fold_index
+            self.evaluations[fold_index] = map_at_five
+            self.maps_per_fold[fold_index] = self.map_playlists.copy()
             return map_at_five
 
     def map_per_cluster(self, tg_playlist, clusters, n_clusters):
@@ -194,6 +204,9 @@ class Evaluator(object):
         Returns the mean map computed over each fold
         """
         return sum(self.evaluations) / self.folds
+
+    def get_map_playlists(self):
+        return self.maps_per_fold[self.current_fold_index].copy()
 
     def evaluate_playlist(self, recommendation):
         """

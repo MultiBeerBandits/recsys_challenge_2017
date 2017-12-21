@@ -4,11 +4,9 @@ from src.utils.evaluator import *
 from src.UBF.UBF2 import *
 from src.IBF.IBF import *
 from src.CBF.CBF import ContentBasedFiltering
-from src.utils.matrix_utils import cluster_per_n_rating,cluster_per_ucm
+from src.utils.matrix_utils import cluster_per_n_rating, cluster_per_ucm
 from src.utils.plotter import visualize_2d
-from src.FWUM.UICF import xSquared
-from src.FWUM.UICF2 import UserItemFiltering
-from src.MF.iALS import IALS
+from src.FWUM.UICF3 import xSquared
 from src.Pop.popularity import Popularity
 
 
@@ -19,19 +17,17 @@ def main():
     ev = Evaluator()
     ev.cross_validation(3, ds.train_final.copy())
     urm, tg_tracks, tg_playlist = ev.get_fold(ds)
-    n_clusters = 10
+    n_clusters = 20
 
     # create all the models
     cbf = ContentBasedFiltering()
     ibf = ItemBasedFiltering()
     xbf = xSquared()
-    uicf = UserItemFiltering()
     # ials = IALS(500, 50, 1e-4, 800)
     ubf = UserBasedFiltering()
-    pop = Popularity()
 
-    models = [ibf, cbf, xbf, uicf, ubf, pop]
-    names = ["IBF", "CBF", "XBF", "UICF", "UBF", "POP"]
+    models = [ibf, cbf, xbf, ubf]
+    names = ["IBF", "CBF", "XBF", "UBF"]
     # for each cluster the best model
     rating_best_for_cluster = np.zeros(n_clusters)
     ucm_best_for_cluster = np.zeros(n_clusters)
@@ -41,7 +37,7 @@ def main():
     # cluster per rating
     rating_cluster = cluster_per_n_rating(urm, tg_playlist, ds, n_clusters)
 
-     # cluster per ucm
+    # cluster per ucm
     ucm_cluster = cluster_per_ucm(urm, tg_playlist, ds, n_clusters)
 
     for model, name in zip(models, names):

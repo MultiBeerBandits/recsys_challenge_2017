@@ -8,12 +8,11 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
 from src.utils.matrix_utils import compute_cosine, top_k_filtering, max_normalize, cluster_per_n_rating
 from src.utils.BaseRecommender import BaseRecommender
-from src.utils.plotter import visualize_2d
 
 
 class Popularity(BaseRecommender):
 
-    def __init__(self, topK=500):
+    def __init__(self, topK=10000):
         # final matrix of predictions
         self.R_hat = None
 
@@ -35,7 +34,7 @@ class Popularity(BaseRecommender):
         self.tr_id_list = list(target_tracks)
         self.dataset = dataset
         urm = csr_matrix(urm)
-        self.R_hat = csr_matrix((len(self.pl_id_list), len(self.tr_id_list)), dtype=urm.dtype)
+        self.R_hat = lil_matrix((len(self.pl_id_list), len(self.tr_id_list)), dtype=urm.dtype)
 
         print("Pop started")
 
@@ -44,6 +43,8 @@ class Popularity(BaseRecommender):
 
         # convert to csr matrix
         pop = csr_matrix(top_k_filtering(pop, topK=self.topK))
+        # scale function, high popularity have the same importance
+        pop.data = np.log(pop.data)
 
         # build R_hat by stacking pop as the number of target user
         # use low level structure of csr matrix in order to be fast
@@ -53,6 +54,7 @@ class Popularity(BaseRecommender):
         print("R_hat built")
         # maybe we need to normalize here to obtain a more precise value
         # for the probability of like
+        self.R_hat = self.R_hat.tocsr()
 
         # clean urm
         urm_cleaned = urm[[dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
@@ -63,7 +65,7 @@ class Popularity(BaseRecommender):
         self.R_hat.eliminate_zeros()
 
         # normalize urm
-        self.R_hat = max_normalize(self.R_hat)
+        # self.R_hat = max_normalize(self.R_hat)
 
 
     def getW(self):

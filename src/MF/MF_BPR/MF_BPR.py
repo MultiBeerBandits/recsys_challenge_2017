@@ -30,7 +30,7 @@ class MF_BPR():
             self.runCompilationScript()
         pass
 
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=2, user_reg=1e-1, pos_item_reg=1e-2, neg_item_reg=1e-3, l_rate=1e-2, epoch_multiplier=5):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=2, user_reg=1e-1, pos_item_reg=1e-2, neg_item_reg=1e-3, l_rate=1e-1, epoch_multiplier=2, use_icm=False):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         self.dataset = dataset
@@ -39,7 +39,15 @@ class MF_BPR():
             urm = urm.tocsr()
             self.urm = urm
             self.icm = dataset.build_icm_2()
-        urm_ext = urm # vstack([urm, self.icm], format='csr')
+
+        if use_icm:
+            urm_ext = vstack([urm, self.icm], format='csr')
+            num_features = self.icm.shape[0]
+            num_user = self.urm.shape[0]
+        else:
+            urm_ext = urm
+            num_features = None
+            num_user = None
 
         if self.eligibleUsers is None:
             self.eligibleUsers = []
@@ -76,7 +84,9 @@ class MF_BPR():
                                                    epoch_multiplier=epoch_multiplier,
                                                    opt_mode='bpr',
                                                    W=self.U,
-                                                   H=self.V)
+                                                   H=self.V,
+                                                   num_features=num_features,
+                                                   num_user_sample=num_user)
 
 
         # start learning

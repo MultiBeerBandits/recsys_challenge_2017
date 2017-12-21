@@ -1,11 +1,12 @@
 from src.utils.loader import *
+from src.utils.evaluator import *
 from scipy.sparse import *
 import numpy as np
 import numpy.linalg as la
 import scipy.sparse.linalg as sLA
 from sklearn.feature_extraction.text import TfidfTransformer
 from src.utils.feature_weighting import *
-from src.utils.matrix_utils import compute_cosine, top_k_filtering
+from src.utils.matrix_utils import compute_cosine, applyTfIdf
 from src.utils.BaseRecommender import BaseRecommender
 
 
@@ -14,6 +15,7 @@ class UserBasedFiltering(BaseRecommender):
 
     """
     0.06352710548141427
+    0.06713337857196691 with tfidf
     """
     def __init__(self, shrinkage=50, k_filtering=200):
         # final matrix of predictions
@@ -49,13 +51,18 @@ class UserBasedFiltering(BaseRecommender):
         ucm = dataset.build_ucm()
 
         # add user ratings to ucm
-        ucm = vstack([ucm, urm.transpose()])
+        #ucm = vstack([ucm, urm.transpose()])
+
+        #ucm = applyTfIdf(ucm)
 
         # build user profile from urm and icm
-        icm = dataset.build_icm()
+        icm = dataset.build_icm_2()
+        tags = dataset.build_tags_matrix()
+        tags = applyTfIdf(tags, topK=55)
+        icm = vstack([icm, tags], format='csr')
         ufm = urm.dot(icm.transpose())
 
-        # Iu contains for each user the number of tracks rated
+        # # Iu contains for each user the number of tracks rated
         Iu = urm.sum(axis=1)
         # save from divide by zero!
         Iu[Iu == 0] = 1
@@ -64,7 +71,7 @@ class UserBasedFiltering(BaseRecommender):
         # multiply the ufm by Iu. Normalize UFM
         ufm = ufm.multiply(Iu).transpose()
 
-        ucm = vstack([ucm, ufm], format='csr')
+        ucm = vstack([ucm.multiply(5), urm.transpose().multiply(5), ufm], format='csr')
 
         # compute cosine similarity between users
         S = compute_cosine(ucm.transpose()[[dataset.get_playlist_index_from_id(x)
@@ -128,3 +135,19 @@ class UserBasedFiltering(BaseRecommender):
         Returns the complete R_hat
         """
         return self.R_hat.copy()
+
+
+if __name__ == '__main__':
+    ds = Dataset(load_tags=True, filter_tag=False, weight_tag=False)
+    ds.set_track_attr_weights_2(1, 1, 0.1, 0.1, 0, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
+    ds.set_playlist_attr_weights(0.2, 0.2, 0.2, 0, 0)
+    ev = Evaluator()
+    ev.cross_validation(5, ds.train_final.copy())
+    ubf = UserBasedFiltering()
+    for i in range(0, 5):
+        urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+        ubf.fit(urm, tg_playlist, tg_tracks, ds)
+        recs = ubf.predict()
+        ev.evaluate_fold(recs)
+    map_at_five = ev.get_mean_map()
+    print("MAP@5 :", map_at_five)

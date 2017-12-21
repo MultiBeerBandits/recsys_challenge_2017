@@ -22,14 +22,11 @@ class WARP():
 # MAP@5: 0.029395310261630093 after 5 epochs with 500 components
 # after 25 epochs MAP@5: 0.04595566613888233 with 100 components: weights: 100 and 50
 # after 20 epochs MAP@5: 0.05749453366508295 with 1000 components same weights as before item_alpha=1e-3, l_rate=1e-3
-# after 20 epochs MAP@5: 0.056064238859986126 with 500 components item_alpha=1e-4, l_rate=1e-2 ds.set_track_attr_weights_2(1, 1, 0.1, 0.1, 1, num_rating_weight=1, inferred_album=1, inferred_duration=0.1, inferred_playcount=0.1)
-# ds.set_playlist_attr_weights(1, 1, 1, 0, 0) (MAP@5: 0.043599487295483554 after 5 epochs)
-# after 15 epochs MAP@5: 0.0564842041770335 with 500 components and item_alpha=1e-5, l_rate=1e-2 icm weighted 200
-# MAP@5: 0.05980924376083806 after 25 epochs with 1000 components
-    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=5, item_alpha=1e-7, l_rate=1e-3):
+    def fit(self, urm, dataset, tg_playlist, tg_tracks, no_components=500, n_epochs=5, item_alpha=1e-5, l_rate=1e-3):
         self.pl_id_list = tg_playlist
         self.tr_id_list = tg_tracks
         self.urm = urm
+        self.dataset = dataset
 
         # Initialize model.
         # Need an identity matrix stacked horizontaly
@@ -39,7 +36,7 @@ class WARP():
             id_item = eye(urm.shape[1], urm.shape[1]).tocsr()
             icm = dataset.build_icm_2().tocsr()
             self.icm_t = hstack((id_item,
-                                 icm.transpose() * 200)).tocsr().astype(np.float32)
+                                 icm.transpose() * 100)).tocsr().astype(np.float32)
 
         if self.ucm_t is None:
             id_playlist = eye(urm.shape[0], urm.shape[0]).tocsr()
@@ -108,12 +105,27 @@ class WARP():
             recs[pl_id] = tracks_ids
         return recs
 
+    def predict_custom(self, urm, at=5):
+        self.R_hat = self.clean_R_hat(self.R_hat, urm)
+        recs = {}
+        for i in range(0, self.R_hat.shape[0]):
+            pl_id = self.pl_id_list[i]
+            pl_row = self.R_hat.data[self.R_hat.indptr[i]:
+                                     self.R_hat.indptr[i + 1]]
+            # get top 5 indeces. argsort, flip and get first at-1 items
+            sorted_row_idx = np.flip(pl_row.argsort(), axis=0)[0:at]
+            track_cols = [self.R_hat.indices[self.R_hat.indptr[i] + x]
+                          for x in sorted_row_idx]
+            tracks_ids = [self.tr_id_list[x] for x in track_cols]
+            recs[pl_id] = tracks_ids
+        return recs
+
     def build_R_hat(self, predictions, user_ids, item_ids, tg_items, tg_users):
         R_hat = coo_matrix((predictions, (user_ids, item_ids)),
                            shape=self.urm.shape).tolil()
 
         # clean urm
-        R_hat[self.urm.nonzero()] = 0
+        # R_hat[self.urm.nonzero()] = 0
         # R_hat.eliminate_zeros()
 
         # keep only target user and tg items
@@ -121,8 +133,15 @@ class WARP():
         R_hat = R_hat[tg_users]
         R_hat = R_hat[:, tg_items]
 
-        R_hat = top_k_filtering(R_hat, 50)
+        # R_hat = top_k_filtering(R_hat, 200)
 
+        return R_hat
+
+    def clean_R_hat(self, R_hat, urm):
+        urm = urm[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
+        urm = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
+        R_hat[urm.nonzero()] = 0
+        R_hat.eliminate_zeros()
         return R_hat
 
 
