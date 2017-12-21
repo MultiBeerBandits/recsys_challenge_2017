@@ -15,13 +15,19 @@ class ContentBasedFiltering(BaseRecommender):
     MAP@5  0.12039006297936491 urm weight 0.7
     MAP@5  0.12109109578826009 without playcount and duration
 
-    Current best:
+    Previous best:
     CBF (album 1.0, artists 1.0, no duration/playcount)
         + URM 0.8
         + TOP-55 (TFIDF (tags 1.0))
         MAP@5 0.11897304011860126
         Public leaderboard: 0.09616
 
+    Current better:
+    CBF (album 1.5, artists 1.6, no duration/playcount)
+        + URM 0.9
+        + TOP-55 (TFIDF (tags 1.0))
+        MAP@5 0.12091444153380929
+        Public leaderboard: 0.09634
 
     """
 
@@ -75,7 +81,7 @@ class ContentBasedFiltering(BaseRecommender):
         # ua_icm = top_k_filtering(ua_icm.transpose(), topK=55).transpose()
 
         # stack all
-        icm = vstack([icm, tags, urm * 0.8], format='csr')
+        icm = vstack([icm, tags, urm], format='csr')
         # icm = vstack([icm, tags, applyTFIDF(urm)], format='csr')
 
         S = compute_cosine(icm.transpose()[[dataset.get_track_index_from_id(x)
@@ -157,14 +163,14 @@ def produceCsv():
     dataset = Dataset(load_tags=True,
                       filter_tag=False,
                       weight_tag=False)
-    dataset.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
-                                     1.0, 1.0, 0.0, 0.0)
+    dataset.set_track_attr_weights_2(1.5, 1.7, 0.0, 0.0, 0.0,
+                                     1.0, 0.0, 0.0, 0.0)
     cbf_exporter = ContentBasedFiltering()
     urm = dataset.build_train_matrix()
     tg_playlist = list(dataset.target_playlists.keys())
     tg_tracks = list(dataset.target_tracks.keys())
     # Train the model with the best shrinkage found in cross-validation
-    cbf_exporter.fit(urm,
+    cbf_exporter.fit(urm * 0.9,
                      tg_playlist,
                      tg_tracks,
                      dataset)
@@ -186,8 +192,8 @@ def evaluateMap():
     dataset = Dataset(load_tags=True,
                       filter_tag=False,
                       weight_tag=False)
-    dataset.set_track_attr_weights_2(1.0, 1.0, 0.0, 0.0, 0.0,
-                                     1.0, 1.0, 0.0, 0.0)
+    dataset.set_track_attr_weights_2(1.5, 1.62, 0.0, 0.0, 0.0,
+                                     1.0, 0.0, 0.0, 0.0)
     # seed = 0xcafebabe
     # print("Evaluating with initial seed: {}".format(seed))
     ev = Evaluator(seed=False)
