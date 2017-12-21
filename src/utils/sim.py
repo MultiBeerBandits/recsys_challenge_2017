@@ -11,10 +11,10 @@ def computeSim(X, Y, filtering=False, shrinkage=40, k_filtering=200):
     mat_len = X.shape[0]
     S=None
     x_norm = norm(X, axis=1)
-    x_norm[x_norm==0]=1
+    x_norm[x_norm==0] = 1
     X = X.multiply(csr_matrix(np.reciprocal(x_norm)).transpose())
-    y_norm = norm(Y, axis=0)
-    y_norm[y_norm==0]=1
+    y_norm = norm(Y, axis = 0)
+    y_norm[y_norm==0] = 1
     Y = Y.multiply(np.reciprocal(y_norm))
     Y_ones = Y.copy()
     Y_ones.data = np.ones_like(Y_ones.data)

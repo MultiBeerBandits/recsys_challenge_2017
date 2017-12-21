@@ -29,9 +29,9 @@ class Dataset():
         # Initialize clusters for duration and playcount
         # selected by studying the error of k-means
         # it was 20
-        self.duration_intervals = 30
-        self.playcount_intervals = 30
-        self.pop_threshold = 5
+        self.duration_intervals = 40
+        self.playcount_intervals = 40
+        self.pop_threshold = 10
         # for created_at of playlists
         self.created_at_intervals = 30
         self.playlist_duration_intervals = 30
