@@ -2,8 +2,6 @@ import numpy as np
 from scipy.sparse import *
 from src.utils.loader import *
 from src.utils.evaluator import *
-from src.utils.matrix_utils import top_k_filtering, dot_chunked
-import subprocess
 from src.utils.BaseRecommender import BaseRecommender
 from src.CBF.CBF_MF import *
 from src.MF.MF_BPR.MF_BPR import *
@@ -13,7 +11,7 @@ from src.MF.MF_BPR.MF_BPR import *
 #  no_components=100, n_epochs=2, user_reg=1e-2, item_reg=1e-3, l_rate=1e-2, epoch_multiplier=5 0.045 after 20 epochs
 class MF_BPR_KNN(BaseRecommender):
 
-    def __init__(self, r_hat_aug=None): 
+    def __init__(self, r_hat_aug=None):
         self.r_hat_aug = r_hat_aug
         pass
 
@@ -41,6 +39,21 @@ class MF_BPR_KNN(BaseRecommender):
 
         # save r-hat
         self.R_hat = self.mf.getR_hat_knn(urm.tocsr())
+
+    def predict(self, at=5):
+        R_hat = self.R_hat
+        recs = {}
+        for i in range(0, R_hat.shape[0]):
+            pl_id = self.pl_id_list[i]
+            pl_row = R_hat.data[R_hat.indptr[i]:
+                                R_hat.indptr[i + 1]]
+            # get top 5 indeces. argsort, flip and get first at-1 items
+            sorted_row_idx = np.flip(pl_row.argsort(), axis=0)[0:at]
+            track_cols = [R_hat.indices[R_hat.indptr[i] + x]
+                          for x in sorted_row_idx]
+            tracks_ids = [self.tr_id_list[x] for x in track_cols]
+            recs[pl_id] = tracks_ids
+        return recs
 
     def getR_hat(self):
         return self.R_hat

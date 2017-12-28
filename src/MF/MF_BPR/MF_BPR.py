@@ -314,7 +314,7 @@ if __name__ == '__main__':
 
         mf = MF_BPR()
         for epoch in range(50):
-            mf.fit(urm, ds, list(tg_playlist), list(tg_tracks))
+            mf.fit(R_hat_aug, ds, list(tg_playlist), list(tg_tracks), n_epochs=1, no_components=500, epoch_multiplier=1, l_rate=1e-2, use_icm=False)
             recs = mf.predict_dot()
             ev.evaluate_fold(recs)
             #recs = mf.predict_knn()
