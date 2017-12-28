@@ -298,6 +298,7 @@ cdef class MF_BPR_Cython_Epoch:
                     # Uniform user sampling with replacement
                     sample = self.sampleBatch_Cython()
 
+
                     u = sample.user
                     i = sample.pos_item
                     j = sample.neg_item
@@ -444,7 +445,7 @@ cdef class MF_BPR_Cython_Epoch:
 
 
 
-                if((numCurrentBatch%5000000==0 and not numCurrentBatch==0) or numCurrentBatch==totalNumberOfBatch-1):
+                if((numCurrentBatch % 500000 == 0 and not numCurrentBatch==0) or numCurrentBatch == totalNumberOfBatch-1):
                     print("Processed {} ( {:.2f}% ) in {:.2f} seconds. Sample per second: {:.0f}".format(
                         numCurrentBatch*self.batch_size,
                         100.0* float(numCurrentBatch*self.batch_size)/self.numPositiveIteractions,
@@ -513,6 +514,9 @@ cdef class MF_BPR_Cython_Epoch:
             i = sample.pos_item
             j = sample.neg_item
 
+
+            # print("[{}, {}, {}]".format(u, i, j))
+
                 
             self.training_step_users[u] += 1
             self.training_step_items[i] += 1
@@ -562,7 +566,7 @@ cdef class MF_BPR_Cython_Epoch:
                 self.H[j, index] -= self.learning_rate * update_j
 
 
-            if((numCurrentBatch%5000000==0 and not numCurrentBatch==0) or numCurrentBatch==totalNumberOfBatch-1):
+            if((numCurrentBatch%50000==0 and not numCurrentBatch==0) or numCurrentBatch==totalNumberOfBatch-1):
                 print("Processed {} ( {:.2f}% ) in {:.2f} seconds. Sample per second: {:.0f}".format(
                     numCurrentBatch*self.batch_size,
                     100.0* float(numCurrentBatch*self.batch_size)/self.numPositiveIteractions,
@@ -754,36 +758,35 @@ cdef class MF_BPR_Cython_Epoch:
         self.epsilon = 1e-8
 
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.initializedcheck(False)
-    @cython.cdivision(True)
     cdef BPR_sample sampleBatch_Cython(self):
 
         cdef BPR_sample sample = BPR_sample()
         cdef long index
         cdef int negItemSelected
 
-        # Warning: rand() returns an integer
+        # print("Sampling positive...")
+        # Warning: rand() returns an integer, in order to avoid integer division we force the
+        # denominator to be a float
+        cdef double RAND_MAX_DOUBLE = RAND_MAX
 
-        index = rand() % self.numEligibleUsers
+        index = int(rand() / RAND_MAX_DOUBLE * self.numEligibleUsers)
 
         sample.user = self.eligibleUsers[index]
 
         self.seenItemsSampledUser = self.getSeenItems(sample.user)
         self.numSeenItemsSampledUser = len(self.seenItemsSampledUser)
 
-        index = rand() % self.numSeenItemsSampledUser
+        index = int(rand() / RAND_MAX_DOUBLE * self.numSeenItemsSampledUser)
 
         sample.pos_item = self.seenItemsSampledUser[index]
 
-
+        # print("Sampling negative...")
         negItemSelected = False
 
         # It's faster to just try again then to build a mapping of the non-seen items
         # for every user
         while (not negItemSelected):
-            sample.neg_item = rand() % self.n_items
+            sample.neg_item = int(rand() / RAND_MAX_DOUBLE * self.n_items)
 
             index = 0
             while index < self.numSeenItemsSampledUser and self.seenItemsSampledUser[index]!=sample.neg_item:
@@ -792,6 +795,7 @@ cdef class MF_BPR_Cython_Epoch:
             if index == self.numSeenItemsSampledUser:
                 negItemSelected = True
 
+        # print("Sampled...")
         return sample
 
     @cython.boundscheck(False)

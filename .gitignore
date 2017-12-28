@@ -118,3 +118,5 @@ eigen-*/
 # Cython builds
 *_Cython_*.html
 *_Cython_*.c
+
+data/slim_bpr*.npz
