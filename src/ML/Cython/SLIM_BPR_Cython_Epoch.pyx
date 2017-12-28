@@ -282,8 +282,10 @@ cdef class SLIM_BPR_Cython_Epoch:
         # otherwise sample from ICM
         cdef double urmProb = self.urmSamplingChances
         cdef double choice = rand() / RAND_MAX_DOUBLE
+        # print(choice)
         if choice < urmProb:
             index = int(rand() / RAND_MAX_DOUBLE * self.numEligibleUsers)
+            # print(index)
             sample.user = self.eligibleUsers[index]
         else:
             # If index is from ICM we need to add to it the number of users in

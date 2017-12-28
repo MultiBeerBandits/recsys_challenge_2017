@@ -4,6 +4,7 @@ from src.utils.evaluator import *
 import numpy as np
 from src.CBF.CBF_MF import *
 from src.MF.MF_BPR.MF_BPR import MF_BPR
+from src.MF.iALS2 import IALS
 from itertools import product
 from sparsesvd import sparsesvd
 from src.utils.matrix_utils import top_k_filtering
@@ -12,7 +13,7 @@ from src.ML.BPRSLIM_ext import BPRSLIM
 
 def main():
     ds = Dataset(load_tags=True, filter_tag=True)
-    ds.set_track_attr_weights_2(1, 1, 0, 0, 1, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
+    ds.set_track_attr_weights_2(1, 1, 0, 0, 0, num_rating_weight=0, inferred_album=1, inferred_duration=0, inferred_playcount=0)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     cbf = ContentBasedFiltering()
@@ -27,7 +28,7 @@ def main():
         # MAP@5: 0.03575133830958298 with 500 factors and ornly urm
         # 0.04349393048329915 with 1000 factors
         # 0.06658599110306855 with 2500 factors
-        ds.set_track_attr_weights_2(1, 1, 1, 1, 1, num_rating_weight=1, inferred_album=1, inferred_duration=1, inferred_playcount=1)
+        ds.set_track_attr_weights_2(1, 1, 0, 0, 0, num_rating_weight=1, inferred_album=1, inferred_duration=1, inferred_playcount=1)
         # icm = ds.build_icm_2()
         # svd_matrix = vstack([R_hat, icm], format='csc')
         # u, s, v = sparsesvd(svd_matrix, 1000)
@@ -41,6 +42,14 @@ def main():
         # # # test if svd is ok
         # recs = predict(R_hat_new, list(tg_playlist), list(tg_tracks))
         # ev.evaluate_fold(recs)
+        # fit ials
+        #ials = IALS(500, 50, 1e-4, 800)
+        #ials.fit(R_hat, list(tg_playlist), list(tg_tracks), ds)
+        #recs = ials.predictDot(urm)
+        #ev.evaluate_fold(recs)
+
+        #recs = ials.predictKNN(urm)
+        #ev.evaluate_fold(recs)
 
         mf = MF_BPR()
 
@@ -48,7 +57,7 @@ def main():
         for epoch in range(50):
             # MAP@5: 0.08256503053607782 with 500 factors after 10 epochs
             # MAP@5: 0.08594586443489391 with 500 factors afetr 4 epochs no_components=500, epoch_multiplier=2, l_rate=1e-2
-            mf.fit(R_hat, ds, list(tg_playlist), list(tg_tracks), n_epochs=1, no_components=500, epoch_multiplier=2, l_rate=1e-2, use_icm=True)
+            mf.fit(R_hat, ds, list(tg_playlist), list(tg_tracks), n_epochs=1, no_components=500, epoch_multiplier=0.05, l_rate=1e-2, use_icm=False)
             recs = mf.predict_dot_custom(urm)
             ev.evaluate_fold(recs)
 
