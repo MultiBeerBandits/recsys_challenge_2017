@@ -294,14 +294,25 @@ def _requireCompilation():
 
 
 if __name__ == '__main__':
+    from src.CBF.CBF_MF import ContentBasedFiltering as CBF
+
     ds = Dataset(load_tags=True, filter_tag=True)
     # ds.set_track_attr_weights(1, 1, 0.2, 0.2, 0.2)
-    ds.set_track_attr_weights_2(1, 0.9, 0.2, 0.2, 0.2, num_rating_weight=0.1, inferred_album=0.8, inferred_duration=0.2, inferred_playcount=0.2)
+    ds.set_track_attr_weights_2(1.5, 1.6, 0, 0, 0.0,
+                                 1.0, 0, 0.0, 0.0)
     ev = Evaluator()
     ev.cross_validation(5, ds.train_final.copy())
     for i in range(0, 5):
-        mf = MF_BPR()
         urm, tg_tracks, tg_playlist = ev.get_fold(ds)
+        cbf = CBF()
+        cbf.fit(urm, tg_playlist,
+                tg_tracks,
+                ds)
+        # get R_hat
+        R_hat_aug = cbf.getR_hat()
+        print(R_hat_aug.nnz)
+
+        mf = MF_BPR()
         for epoch in range(50):
             mf.fit(urm, ds, list(tg_playlist), list(tg_tracks))
             recs = mf.predict_dot()

@@ -2,6 +2,7 @@ import scipy.sparse as sps
 import numpy as np
 import time
 import sys
+import os
 
 from src.utils.matrix_utils import top_k_filtering, writeSubmission
 
@@ -294,7 +295,6 @@ def _single_run(params):
 
 
 def _requireCompilation():
-    import os
     moduleSubFolder = 'src/ML/Cython/'
     pyx_source = moduleSubFolder + 'SLIM_BPR_Cython_Epoch.pyx'
     c_source = moduleSubFolder + 'SLIM_BPR_Cython_Epoch.c'
