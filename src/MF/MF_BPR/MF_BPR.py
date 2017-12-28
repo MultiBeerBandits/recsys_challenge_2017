@@ -25,6 +25,7 @@ class MF_BPR():
         self.target_users = None
         self.U = U
         self.V = V
+        self.S = None
 
         if _requireCompilation():
             self.runCompilationScript()
@@ -104,6 +105,15 @@ class MF_BPR():
         # IxF
         self.H = self.cythonEpoch.get_H()
 
+        # build the similarity matrix
+        S = csr_matrix(self.m_dot_chunked(self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.H.transpose(), topK=100))
+        print("S done")
+
+        # Normalize S
+        s_norm = S.sum(axis=1)
+        S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+        self.S = S.transpose()
+
         print("R_hat done")
 
 
@@ -166,6 +176,7 @@ class MF_BPR():
         # Normalize S
         s_norm = S.sum(axis=1)
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+        self.S = S.transpose()
         R_hat = self.urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S.transpose())
         urm_cleaned = self.urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
         urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
@@ -193,9 +204,11 @@ class MF_BPR():
     def predict_knn_custom(self, urm, at=5):
         S = csr_matrix(self.m_dot_chunked(self.H[[self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]], self.H.transpose(), topK=100))
         print("S done")
+
         # Normalize S
         s_norm = S.sum(axis=1)
         S = S.multiply(csr_matrix(np.reciprocal(s_norm)))
+        self.S = S.transpose()
         R_hat = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]].dot(S.transpose())
         urm_cleaned = urm[[self.dataset.get_playlist_index_from_id(x) for x in self.pl_id_list]]
         urm_cleaned = urm_cleaned[:, [self.dataset.get_track_index_from_id(x) for x in self.tr_id_list]]
