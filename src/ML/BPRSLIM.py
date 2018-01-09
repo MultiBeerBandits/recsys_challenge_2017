@@ -295,7 +295,6 @@ def _single_run(params):
 
 
 def _requireCompilation():
-    import os
     moduleSubFolder = 'src/ML/Cython/'
     pyx_source = moduleSubFolder + 'SLIM_BPR_Cython_Epoch.pyx'
     c_source = moduleSubFolder + 'SLIM_BPR_Cython_Epoch.c'
