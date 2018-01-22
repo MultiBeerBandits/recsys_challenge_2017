@@ -306,6 +306,7 @@ def _requireCompilation():
 
 def _runCompileScript():
     import subprocess
+    import os
     compiledModuleSubfolder = "/src/ML/Cython"
     fileToCompile_list = ['SLIM_BPR_Cython_Epoch.pyx']
 

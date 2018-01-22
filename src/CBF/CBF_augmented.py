@@ -155,7 +155,7 @@ def evaluateMap():
 
     ev = Evaluator()
     ev.cross_validation(5, dataset.train_final.copy())
-    cbf = ContentBasedFiltering()
+    cbf = ContentBasedFiltering(alfa=0.999)
     for i in range(0, 5):
         urm, tg_tracks, tg_playlist = ev.get_fold(dataset)
         cbf.fit(urm,

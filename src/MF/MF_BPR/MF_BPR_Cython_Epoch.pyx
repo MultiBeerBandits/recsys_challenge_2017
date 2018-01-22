@@ -413,7 +413,7 @@ cdef class MF_BPR_Cython_Epoch:
                             update_j = self.get_rmsprop_update_item(gtj, j, index)
 
                         else:
-                            # the update is normal
+                            # the update is the same
                             update_u = gtu
                             update_j = gtj
                             update_i = gti
@@ -445,7 +445,8 @@ cdef class MF_BPR_Cython_Epoch:
 
 
 
-                if((numCurrentBatch % 500000 == 0 and not numCurrentBatch==0) or numCurrentBatch == totalNumberOfBatch-1):
+<<<<<<< HEAD
+                if((numCurrentBatch%50000==0 and not numCurrentBatch==0) or numCurrentBatch==totalNumberOfBatch-1):
                     print("Processed {} ( {:.2f}% ) in {:.2f} seconds. Sample per second: {:.0f}".format(
                         numCurrentBatch*self.batch_size,
                         100.0* float(numCurrentBatch*self.batch_size)/self.numPositiveIteractions,
