@@ -120,3 +120,4 @@ eigen-*/
 *_Cython_*.c
 
 data/slim_bpr*.npz
+data/mf_*.npz
