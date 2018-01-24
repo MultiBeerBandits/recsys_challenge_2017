@@ -6,13 +6,14 @@
 \usepackage{tikz}
 \usepackage{amsmath}
 \usepackage{subfig}
+\usepackage{listings}
 \usetikzlibrary{positioning}
 \usetheme{metropolis}           % Use metropolis theme
 \title{ 
  RecSys Challenge \\ MultiBeerBandits
 }
 \date{\today}
-\author{Emanuele Ghelfi \and Leonardo Arcari}
+\author{Emanuele Ghelfi \and Leonardo Arcari \and \\ \url{https://github.com/MultiBeerBandits/recsys_challenge_2017}}
 \institute{Politecnico di Milano}
 \titlegraphic{ \includegraphics[width=.8\textwidth]{mbb.png}}
 \begin{document}
@@ -202,6 +203,15 @@
   $$
   \end{block}  
   Let $i$ be a user belonging to cluster $j$, the prediction $\hat{r}_i^{j}$ is computed from the ensemble similarity matrix personalized for that cluster ($S_{ensemble _j}$). 
+  \end{frame}
+  \section{Lessons Learned}
+  \begin{frame}{Lessons Learned}
+  \begin{itemize}
+  \item Exploration/Exploitation trade off
+  \item No Free Lunch theorem (No superior algorithm)
+  \item Do Ensemble
+  \end{itemize}
+  
   \end{frame}
   \begin{frame}[standout]
   Thank you all!
